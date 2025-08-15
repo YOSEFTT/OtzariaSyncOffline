@@ -410,8 +410,10 @@ class WorkerThread(QThread):
             response.raise_for_status()
             
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(response.text)
+            
+            # הורדה בינארית של כל הקבצים - שומר על הקובץ בדיוק כמו שהוא במקור
+            with open(target_path, "wb") as f:
+                f.write(response.content)
             
             return book_name, None  # הצלחה
             
