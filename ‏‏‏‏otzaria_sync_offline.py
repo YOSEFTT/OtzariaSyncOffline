@@ -7,12 +7,15 @@ import shutil
 import requests
 import sys
 import gc
+import urllib3
 from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                            QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, 
-                           QFileDialog, QMessageBox, QFrame)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QPixmap
+                           QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
+                           QGroupBox, QGridLayout, QSpacerItem, QSizePolicy, QMenuBar,
+                           QMenu, QStatusBar, QSplitter, QTabWidget, QScrollArea)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup, QSequentialAnimationGroup, pyqtProperty, QSettings, QPoint, QSize
+from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, QAction, QShortcut, QPainter
 import base64
 import concurrent.futures
 import threading
@@ -33,7 +36,7 @@ COPIED_DICTA = False
 myappid = 'MIT.LEARN_PYQT.OtzariaSyncoffline'
 
 # מחרוזת Base64 של האייקון
-icon_base64 = ""
+icon_base64 = "iVBORw0KGgoAAAANSUhEUgAAAUcAAAFGCAYAAAD5FV3OAAA2q0lEQVR4nO3deXAc5Z038O/zPN09lyRb8m3ZxvjAQCoQCNcLbDgLSEKFbL1kIbs56iUhFZK8OclBVUjYLGyyZAmwgWySyrFLIJvsLgUblgDGOYC84T4MWQwBbIOxLcuyZFmaq/s53j+mu90ajw5bM9M9M79PlUqjmVHPMz3dv/k9ZwOEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEDIpFncBkmDJkiU179+5cyf6+/trPrZ9+/ZGFomQuli0aFHN+7XWE/7evXt3M4rTUjoyOFYHQ8Yqu8EYM+F+IUT4WPC7+n8m+3u658z0san+52BUv7ep1HrNyX7Xs4xR1eUN/o7eX33fZL9rba+WepR9stecqiwzfazW35M9J/jypuB46Ky4C9BotbJCxhiMMeCcgzEWPeEZgMnOoqkeIyRW1V9Qy5Ytm/C4MYYBMJGgSMfzNNo+OFbjnIdBEQceIAccLH7wZP7tA1KLybKNJGSN0Yxiqv+f7HnTZY3TZZGzUZ1NVWf3wX21ftdS/dhMyjnVc6KPzTQTrFf2OMl9zBijp3j/Bqgc//5vY4yBMeaALJJUtH21ur+/PzggWHCARHHOYYxhWmsYYxhjjAkhgm9ZY4wxWmujlIKUElrr8GA62JNtMvUKKI0yXfmaUf6DaRY4lOc30qGUZabNAIwxCCEghADnnAU/QS1IKWW01sZPCkyw7SCTrH7NHTt2HHRZ21Wyz8pZ6O/vhxAiPMiCE5hzDiklGGNMa81LpRI8z1N+cAyfH8kuAQDGmJTW2qpxYB3yPmxAUGnq59nsoJ6kgHeo6vweDGNM+T9udTartQ4DqB8chW3byGQymjFmpJQQQtTMHLXW2LlzZz3L2nLaLjguX768ZrXV8zzGGGP5fJ4ppbTxj1IpJZRSAsAcrXWfUqpfCHFMd3f323K53CopZXepVHK01jmtteUHVh7HeyMHqtXUUU8mgRE5eM+mUtWRnHPPtu2y4zglzvlooVB4dXx8/Dmt9YtCiB1CiBEAYwDcIMv0CcuyTDab1VprWJZVs0rfqdlkywTHqYbbAAcGRc45XNcFAJbP57lSSgGAUiqoGi+WUh6TzWYvtm371L179y4G0MU5T0W3P1U7FiFJ4NdmDOf8gPNZa10GUFi4cOGQ67qPjY6O3mHb9vMAdgYZpR8shRBCZ7NZAwCWZU3IKDsxSLZ8cLQs64BM0fM85PN5LqXkjDGplAraFQ/3PO+dvb29l42MjBwOoBeV6nF0AxqAivwtULtXj3r7SBIZ7D+muf9TbW9fX9/WkZGRf+Gc/0oIsQVA0H4pjDHGD5SwbXvixjsoSLZicAyDUnVg9DwP4+Pj3O9ACYYt9Lmu+86enp7P7Nu3760A0pHNKlSCYXAgMezfJxT4SDswkd/BsW5F7ivMmTNn0759+24VQvwX53wEABhj3O/k0blcDpY1cWBL0CbZzpMkWjE4hh9U0NhcLpcxPj7OjTFMSqkAQEq5FsAnlVLvB7AQlcZrZoyR2B8EW+b9E1JHJvJjRZqOBhljPwPwfSHEq/4oD+5PhtDZbBapVGrKoVtBVZyCYxMtWbIkGK4AAGFQHBsbg9ZaBG2KUsq32rZ9Vblc/t8AHP/fg2pyEBCrq9KEdKogSAL7m5A8x3Hu9Dzvm0KIF/wAyIUQhjFmurq6kE6nq7czYZB5OwTHlul1tW07HF6jlMLY2BjGx8eFP/ZQKaVWaa1/rLV+tlwuvx+VwCgxsf0lCIgUGAmpiLZNBu3tjuu67zfGPKuU+oFSamVluK82WmtRKBSQz+fDIXF+Da7tmqFaIkisXLkyvF0sFjE+Ps601kxXZJRSX9RafxlA1n+axMRgSAiZXlCrCtong4bGAoC/tyzrBsZYiTHGOeeGc25yuRyy2Wy4ASklgPbIHBMdPFauXBlWo6WUyOfzKJfLQkqptNaQUp4nhLjZ87wj/X+hoEhI/UwIkqlU6uVyufxJ27Z/42eLwrZtlUqlkMvlwvGTxhhs3bo1vlLXSWKDyKpVq8LG3mKxiL1790JrLYwxSmud0lpfr5T6tP90CoqETG+qWV1TDU2rziRvtCzrKsZYmXMuOOeKc465c+eGHTZaa2zZsqXOxW+uRAaTtWvXhrfHx8cxNjbGPM/jxhglpXy7EOLHnucdi8oHBkz+PqjjhZCZmcm5EgRPbtv281LKyyzLepoxJhhjxrZt3dXVhVwuFyY2r7766oQNHHnkkajlpZdeml3pGyBxHTJHHHFEOEQnn8/Dn+4HY4xyXfeDWuv/5wfGmWSLFBgJmZnJzhVWdZsBkJ7nHWOM+aPneZcZY5QxBkopVigUUCgUwvncRxxxRONL3iCJCo5HHnlk2CM9Ojoa9EYbv33x2wBuw/5e6MlmrhBC6i9aJReonIMWgB97nvftoDfb8zyez+cxOjpaeTJjWLduXa3tJT5xSUwBjzrqqPD2nj17UCqVuJTSKKUcxtgvS6XSe1AZZkBti4TEj6HSrKUBWI7j3G2MuZRzXhZCCMuyVDqdRl9f34S1OIMO1uqVgJJYrY51sdsgIAY7zBgTDYxaKdWltf4vz/POBuBh4rQnCpCExCc4BwUA13Xd91qW9Wut9XsBjBljuDFGDw8PY968eRNW3G8VsVargxVBgh03MjISBkYp5Vyt9XopZXVgBCgwEpIkNgBPKXU2gPVa6x5jjFZK8VKphNHR0ehg8bjLOmOxZo6RncVGR0dNsVgMM0YA93medwr2t20QQpLLMsZ4nuedYlnWfUqp8wGMK6V4oVDQlmWZnp6ecJhPEqvR1ZoedN7ylreEt4Pq9NjYGMbGxpgfGB1jzH+5rnsKDswYCSHJEh0faQHwpJSnplKp/9ZaXwDABcDGxsYM5xzd3d3heZ90sZUyGE1fKBQwMjIC13W5lJIB+HfXdWtVpQE0fuVnQkhNU40ljrIAyHK5fAbn/Be6svABd12X7d27F8ViEYwxHHvssQ0u7uzFEhz9dkamlMLg4CDK5bJQSikp5Q2lUukiTJExJnHZekI6wEzOuyCLFADcUql0kZTyBq21klIK13UxODgIpVRLBMimB8egAwaAiUwJlKVS6W+klJ9DJTCKqbdCCEmg6CgSAcDTWn/edd3/Y4yRWmuhtcbw8HA4SPyYY46JsbhTa1h73mRvOmhv2LdvH4rFItdaK8/zjgPwY1TGMQpQbzQhrS4Y5qMAfN/zvKcdx3nev+KnHh0dxdy5cw9YYTxJmpo5Bu2MrutiZGSEua5rlFK2bds/A5DCgeMXqQpNSGsK1ok0ABwhxG1aa0spBdd12cjICMrlMhhjePvb3x5zUWtrRnCsLCMcWcF73759UEoF13q5oVQqvQX7pwRG/48ySEJaV9D+KKWUxyqlbvSnGXIpJUZGRsLhfMcdd1zcZT1AM4KjARDOmc7n8ygWi0Ippcrl8rlSyv+L/dMCD/g/QkjLiq68L7XWn3Jd9wxjjFJKiVKphH379gFA9FraidGUanXwxrXWGBoaYuVyWSulrEwm833sr0pTlkhIa6q+/Ej1FTzDOGPb9veUUlwpZcrlMhscHIQxJpHV66YEx2BoYj6fh9aam8pXx9fGx8dXo5I1UmAkpHWZSX5HCVSWOjva87yrAGj/WvLYu3cvGGOJ65xpeFA6/vjjw4tibdu2jZdKJe153nIp5RatNWWMhHSOoJbocc6X2ba9m3PO0um0Wb16dVjDfPzxx2MtZKDhmWM0a/QXrQVj7FpjjMD+lbwJIe2Pwb+6odb6G/58Dq61DhanSNTCFA0tydvf/vZwovnrr7/OS6WSLpfLR0opXwQtO0ZIJ4pWuVenUqmtQgieyWT0mjVrJvRPAMBjjz0WQxErGpo5Bt8ChUIBSiljjGGWZX0d+xfKpOBISGcJzn3OGPu61pr5l1jA2NhY5QkJyR4bFhyDcUuMMezdu5dLKY3neYeVSqX3YX/WSMN1CGlzNRaL4agsk/BBpdRSrbWRUvLh4WHAT5iSMLSnYcHRsiwwxlAoFOC6LrTWMMZ8DvunFLXGukWEkFmpsVhM0PYotNafNZWR4cx1XRSLRZOUtsdZlWCycUnGmHCBidHRUTY4OGhKpVKX53lvSinngKrUhHSaWlODOed8RAhxmGVZY+l0mi1YsMAsWrRo/5P8uPqHP/yhqYUFGpS9BYHRH8PEpZQoFosXSil7QOMaCelE1ec8A6C01r2e571TKQXP88To6Ci01onoua5XcJzwLoI3VSqVgtW97fnz519FC9USQlA1gyaTyXwGAPx1H1EoFIAErGtdr+AYzp8O5lAzxiClZP5smKVDQ0NH+ykyDfwmpLNFr4GNYrH4dqXUCr/tkReLxehzYlPX+TrRVNgYg9HRUSalhOu67/ZfK1h5J/Y33k7mzZuHJUuW4KSTTsK6devQ39+PdDoNWjR9Zowxwbx/bNu2DQ8//DBef/11DAwMHHB9ZVJXHJWYkFJKnae1/pGUko+OjuqFCxcCqDTRKaViKVyjJjMyz/OM53laSmnNnz//47t37wYakDEKIZDJZGoXgrFpA8RkzzHGwHVdSCkTGWSEEOju7sZHPvIRnHXWWTj88MORyWQghAizd3JwtNZQSuHyyy/Hjh078Nxzz+G6667Dnj17IKWMu3gzZts2UqlU3bertUapVGrIF0Y2m71MSvkTpZTyPA+u6yKdTodTj+NQ1zPopJNOAuccxhiWz+exY8cOk8/nF5fL5VcAdGF/L3VdZsdwznHaaafha1/7WtiIG5hJYKx+XvS21ho/+9nP8Mtf/jJxJ0ZXVxcuuugifOADH8Dq1auRy+Va5opurSL4chwaGsK9996Lf/7nf8bAwEDcxZqW4zj42Mc+hve85z3hajf1Mj4+ji984QvYsmVL3bYJv9caQMGyrNW2bQ9ks1m2YsUKM2fOHDDG8Lvf/a6erzdjDckcGWPG8zzLGCNd1z0KlcAYHdtYl0+Mc45FixbhzDPPDF63HpsFAHieh0ceeSRRQYcxhkWLFuHyyy/HJZdcgt7e3rB8wYlQ7xOiE0z2RZpKpbB06VJ86EMfwtq1a3H99dfjhRdeiC2TmQkhBNatW4ezzjoLQH3PiaGhIXR1dc048ZhE9eQPhkrVOiOlPMa27QH/Ugpq7ty5YIzhjDPOAAA89NBDsyr/wap7m2NgfHzceJ6HdDr9V34Da5A11vXMDS7UU+sgmE2giHYsJUUul8PnP/95XHzxxQc0JQTljP5OYnNAEtWqOUT3YzqdxhlnnIG+vj585jOfwauvvproABntGK33duug1kFpADDbti/SWq/3PI+NjY1h8eLF9Xi9Qzbrd3viiSfixBNPxMknnxx+GFpruK6rpJTCcZzTpnitWX161QfyARtPUGCbLcdx8OlPfxoXX3wxstnspM+LdoiRgzPZPgu+gI899lhcf/31mD9/fqJqFLW02LHPAcCyrFO01kwpJV3XhVKK+ffHV6h6CTItf6VfGGP6RkdHlwcPowFZ42RlmM1P0jDGcP755+PSSy+d0As9WUcSqa/oPj3++ONx5ZVXYu7cufEV6CAl/HwI40KxWFxpjJkXLEQhpYx1KmE9g2O4RLqUMuj56wKQ9t9crXdIZ/IM9PX14YorrsC8efMmZIZJDOTtzrIsvPvd78app56aiMUR2kA0BsxRSi0AAKUU9zwv1mO8nsExXCJda8201pBSLuacp40x1X3/FBQPwrnnnou1a9dOqMolvVrXTqpP0Llz5+KCCy5Ab29vTCVqO+FCFMaYfgDQWrMgOMZ1CYWGnGH+CjwAsM4/sKpbr6svxEMmYds2/vIv//KADhiqPjdP9b5mjOHYY4/FqlWrYipRWwoSqJOMMTDGsOgQujgG4zcqODK/l++4aU5iOsOnsXr1ahx22GGTtq+SePT39+Poo4+mDL7OHMd5q58tGilleIDH0YQx60/2ySefxJNPPhm2gfkdMoYxBiHE0inaG8k0GGNYsmQJ+vr6ap6ElD02X/CF5DgOli9fTu2O9cMZY7BteyUAGGO067pmuhEpjXTIFfmTTjoJwP6IHi28UkoDgOM4/f4Yx1poJfAZSKfTE/YxBcR4RU/WhQsXwrIseJ4Xc6nagzEGnPNFUsqUMabsum4YI+IIjo2oEzCllAHAjDE9k2SOBhQYZ6Srq2vCLBiSDIwxdHd3U7W6foLhPBmtdcofK115IKbhPPX4ZA/oXPHHOHLXda1JTmiqZs/Q2NhYXRqjOz2wNqJ6Rm2+9SeltIwxltY6zMhbeZyjqfod9FY7AOq/NAg5JJ2e4VSfYBTYEitljEn7QwFj/ZDqdsZEU18/ONqMMbte2yezQ+sSVkRnF1GATCRhjLGMMeFqWHFVqxsysjIYpwQaz5gIjDGUSiXk8/m4i9J01Z1Yxhik02nkcrkYS0WmYPz4EXtT0CEHxyeeeGLC36eddlr1UxhjrLPrcjGqXoDi8ccfxz/8wz/A87zYD7o4cc5x4YUX4vLLL58wsH6qzKST91dMGBB/dn/IwfGUU06Z7imULTbIwR4wxhiMjY3h5ZdfRqlUqrlEV6ewLAvHHXfchGaG6fZn9eOdts/iUr0MX7M1dMIio0adupvNLlVKTQgKnXiS+yMp4i4GmUJSwkbdhvJMs9RRMt5tB4p+Dkk56Fod7cfOUM+hPAeIZI70VU0SabaBjgJlY7VkmyMhhDRDKw8Cn5Shxp26OtSDJKkrnMeBmhnITB1y5vjYY49N+Pv000+fdWEIaYZ6BEUKrO2v7tXq6EFDmSNpZxQgG68triFDVTdCSDtp9AwWyhwJIYesrXqrKXskhNRTu1arKVISQg5ZW2WOpDEoIyedqm3mVtNJXF+0P0kno95qUhPtT0LiQ5kjISSx2iJzrIUCJSGkVdUtc4yuPE1BkRAyW5Msf9g0VK0mhCRWW1SrqUOGEFIniZhZR5kjISSx2iJzJISQemuLGTLVlwJFQlJjQkhrow4ZQgip0hbVauqQIYS0k0ZmjlStJoTMSluMc6zR5kiXSSCEzEpbBMcAVa0JIfVEbY5kSpSEk04SxJK2GMoToABZPxQQSadri2p1rTZHQgiZrZavVgcocySE1Euc8aQhbY7U/kgIqYc4ly2jNseEo2YK0qnaZj1HCoqEkEZomzbHKEYRMxGMMVBKxV2MRNBa121fUFbfeG0xlKfWm6AZMsnAGMNZZ52F9evXU5AE0Nvbi0wmM+PnM8aqZ36F95PGaqtqNcXDZOrp6UFXV1f4OWmtO/LkPpSTLXpdpOC2MYaO9SZp+eAYiL4RyhyThXMentxCiLiL0zSzuehbNBhW68Qvl2ajJctI03Ti5zTZ+53Jd3cn7q8kaYtxjoGq8Y50VCVErTazTnQolxDu5P0Vt7YY50hxMJmqOw8mqyK2u+rq8aEer9FtdOJ+jEPbtDlGUeYYv+qPoJNP6Hp8MUT/f2xsbLZFItNoqzbHyBth1CEzO8YYDA8PY3x8vKODWj0camCc7MTUWmNgYACu6862aGQKbdXmSOrr1Vdfxa5duw4YOkJJeXNMFlCLxSJee+01GjfaBHFljxQcE25kZAQPP/wwyuVy9TCpGEvVear395YtW/DCCy9QcGxjFBwTzhiDf/u3f8Pg4GDHDtyOU60VqaWU+OMf/4itW7fGVKrOEPex3pDgSEN56mvbtm245557kM/nKWNssuqmDGMMXnnlFdxzzz0oFosxlqxtMf8ndg3LHCku1o/nebjlllvwxBNPUAdAjIwx2LNnD+644w5s2rSJqtRtjqrVLWLfvn246aabsGnTJkgpAdAXUDMZY5DP53HXXXfhl7/8JQqFQtxFIg1GS5a1CGMMnnnmGXzzm9/Ec889ByklVbGbgDEGrTVGR0dxxx134MYbb6ShVR2ioYPAaZxjfSml8Mgjj2Dv3r34+Mc/jnPOOWfCSjuB2Sy0QPYzxkBrjVdeeQU/+clPcNddd2FsbIwCY2Ml5sBtaHAk9aeUwvPPP4+rrroK55xzDt73vvfhuOOOQ09PT9hhQIFxdjjn8DwP27Ztw4YNG3D77bfjz3/+My1T1mEoOLYgrTX27t2Lu+++G/feey9OOOEEHH/88Tj++OOxatUqZLNZWJZFJ/JBYIzBdV0MDw/j+eefxzPPPINHH30UO3bsgJQSWuu4i9gpEnPQUnBsUcYYSCnDMXdPPPEEHMeBZVkQQlD2eBCCjDu4hILruvA8D0opCoodjIJjG1BKQSmFcrkcd1EIaRs0lIcQkiSJqVZTcCSEJE0iAiQFR0IIqYGCIyEkSdp/bjUhhLQyCo6EEFIDBUdCCKmBgiMhhNRAwZEQQmqg4EgIITVQcCSEkBooOBJCSA0UHAkhpAYKjoQQUgMFR0IIqYGCIyGE1EDBkRBCaqCVwFsY5xy2bQOga1g3ilIKnufFXQwSAwqOLUoIgZNPPhnvfe97YVkWOOd0Qa0GGB0dxfXXX49CoRB3UTpJIr7pKTi2KM45jjnmGHz0ox9FLpeLuzhta+fOnbj55pspOHYgCo4tzrZtqlo3iDGGruTYwahDpk3QCVx/jDFwTqdIHJJwPNMn3waScCAR0m4oOBIyBerk6lwUHAmZAmXlnYuCIyGE1EDBkRBCamhkcKT6SANRdY+QxqLMkRBCaqDgSAghNVBwJISQGig4EkJIDRQcCSGkBgqOhBBSAwVHQgipgYJjG6D5v4TUHwXHNkADwgmpPwqOLa46a6QskpD6oODYooIgGFw7JvibskhC6oMuk9DiPM+DlBIABcZ6M8aE+5Z0HgqOLcoYgy1btuC+++6D4zhgjE0IjsYYCpazZIzB8PAwXZq1Q1FwbFFSSjzwwAPYsGFD3EVpe1rruItAYlC34BhkKdQh0FxKqZr3M8bosyBkFqhDpk1RYCRkdig4EkISK852c2pzJIQkWlwBsu6ZI/WQEkLaAVWrCSGkBgqOhBBSAwVHQkhiUYcMIYT4qgNiy3fIVE9fI4SQVka91YQQUgO1ORJCEivOZIuCIyGE1EAdMoSQRGv5DhlCCGknFBwJIaQGCo6EkMSiDhlCCEkY6pBpUbZt4+ijj8bSpUsB0PjSRjDGoFwu4+GHH6YLbXUgCo4tynEcfO5zn8NFF10Ud1Ha2sDAAE499VSMjIzEXRTSZBQcWxTnHI7jYM6cOeF9lD3WlzEG+XwenFPrUyeiT71FVc9lp8BYf3TRuM5Wt8wxOIDoJG0+2ueNQ/s2fnF9OVHm2MLoxCXtLs6snYJjizLGUHWPkAaqe3CkE7Y5KGskpLGozZEQkmjU5kgIIVXirInWPXMkhJB6iiu20CBwQkiiRINhnB2PlDkSQhKrLarVhBDSCJQ5EkKIL4gncVarG9JbTQOUG4/2L+kEbVGtppOVENIILV+tJs1HA+6bg77449OuvdV0RDUQY4xO2iahL6F4xN08R5kjISTRWj5zDFA2Qwipl7borY47Be5ktN8bg47pzkbV6hbleR527NiBTZs2hfdR21h9GWOwe/duuvJgjNquQ4a+bRuvVCrh6quvxnXXXRd3UdqalBL5fD7uYnSaMIC0RXAkzWWMQaFQQKFQiLsohLQl6pAhhCRWW2SOtBI4IaQRWr63mhBC6q0tBoFTdZoQUk9BlZoyR0IISRDqkCGEJFZbZI5JmE1QzzJQxxJpVXTs1kfLj3OMBkPGWN0ODMYYLKvldw/pQO103LZF5hho5hsxxkBr3ZDZOZxzzJ8/H5xTsyxpHYwx2LYddzHaQkOq1c0KkMYYjI6OTpjeFWSOsy0DYwxdXV0UHElLmTNnDubPn9+QbceRxcXZY92wM79Zb6ZUKsF13QNed6bV66nKedhhh2HRokWzKyAhTdTX14ejjz66Idt2XRe7d++OvW+hWRqaFpkG70VjDPbu3Yvx8fFD/sCmCqJvectbsHLlykMsHSHNxTnHihUrsHjx4vC+2bbBR8+rYrEIpdSstneoZWiLzLHZbY7bt2/H6OhoXbcbHFA9PT049dRT26qBm7SvTCaDd73rXXAcp27bjAbXkZGRpi/fFmeW2vJDecrlMkZGRhqybdu2cfbZZ6O7u7sh2yekntasWYMzzjgDQoi6bjc4r1966SV4nlfXbU/3mnFqVm9DwwZeKaWwceNGaK3rvm3GGE444QRceuml1DFDEi2VSuHCCy/EmjVr6r7tIHvcuHFjM4Jj/FHRd8j1xVNPPXW6pzC+P6IYNChAaq2xcePGun/TBFf3y2azuOKKK/DAAw9g8+bNdX0NQuqBc47jjjsOH/zgB5FKpcL76zXm1xiDcrmMF198sVltjhNO5rYZ5xhhGt0hA1SC48svv4w9e/Y0ZCgR5xxHHHEEvvOd72DBggV12y4h9dLb24vrrrsOq1atqvvsmOBc2r59O1555ZWG1NCqX7LRLzBT9QiOsc5V0lpj8+bN2Lx5c0OyRwBwHAfnnnsuvv71r6Ovr6+ur0HIbPT29uLWW2/FKaecMqHjsJ5B0hiDV199Fdu3b29WFpeIAFmP4DjpG2lG5ggAAwMDeOaZZ8KUv54vGxxk2WwWH/7wh/GNb3wDS5cupfmrJFaMMfT39+Pmm2/Ge97zHqTT6QmP1ZMxBhs2bGjaMJ5oDbBtequjGGNK7d+bDX+H9913X3g9laC9sF6iAfKyyy7Dj370I7ztbW+re68gITPBOccJJ5yA22+/HZdccgnS6XR4jNY7YwyuwPjoo482KjgGJ2pQcAVAVz0Wi4a0Ofr9MJpz3pzWW2PwzDPPYNOmTQ37dgsWtUin0zjnnHNw55134lOf+hQWLVpEWSRpCs45lixZgq985Sv4j//4D5x++ukT5lFHj8N6JQdBh+cLL7zQqPbG6pNHAigxxsIRInFlkIfcW/3HP/5xwt9nnnlmeJtVSM55cwZFAdi1axfWr1+Pt771rcjlcg15jSAjtW0by5cvx7XXXouPf/zj+MlPfoLbbrsNo6OjKJVKDXlt0rkymQzmzJmDT37yk3j/+9+PxYsXI5PJNOVL2XVd3H333RgfH2/0SwUjWjzOeZkxFnvNrCFTP4QQhjHmcc6rI0XDhvQYY3D77bfj0ksvxZo1axpSzQi2Z4yBEAK5XA5r167FNddcg09+8pNho/VLL73UkpdM1Vpjw4YNePnll5vRK9lQ2WwWf/3Xf92wL8pGM8agp6cHRx11FJYsWYJ169Zh7ty5E6rQgVrHeD2mDSqlsGnTJqxfv74ZmVvwAp6fWIUdTG1x9UH/AzFCCMYY0wD2+m+sul2hIV5//XU89NBDWLZsGbLZbHW5Jtyejej2OOfIZDJYsWIFVqxYAa01PM9ryeCilMLIyEizhmw0VHd3N66++uqGrVDTKNFjlHMO27YnnYDQ6MyxVCrhV7/6FbZu3drQ14nKZrNlKaUUQsBxHFOvVbYOxSEHx1NOOWXC39EeJsuyOGNMeZ43wDlvWi+X53m44YYb8I53vANHHHEEgIkHUCOyyEDw/jnnEwbithLP89pmJhBjDI7jIJPJxF2UWaleq7QZn0+QNW7duhW33XZbU4fvGGMGOeeSc85SqVT4wi218IQQYsJPtNFUCMGMMfA8742qzLHhNm/ejDvvvBPFYrGpHSVBh02r/rT7dcfj3r9T/UxVviAYRm8H6hEwqrcR/D0+Po4777wTb7zxxqxfY6ZFAQCl1Ov+e+XR4UlxrAZUt0HgWuvwg7Ysy/hTjp6KPqcZpJT4wQ9+gD/96U9h1bAZvV1JmCg/G9ETr90CZNLfz2Tlm+4Lq15NRNXHrlIKzz33HG666aamN6+4rvtkULRoDezee+9tajmAOg/liWSOwfjvl/0bTa2rbdu2DTfddBPGxsaa9ppJPwGn0uqBvZa4BxDXQ7OOqep2vYGBAXz729/G3r17m/Ly/u8gRmz0f5u4m6caMkMm6IIXQuwxxpT812nqkXrXXXfhlltuaXo63oonZJyN3o0SrbK2qmavjQpUOmH+9V//FRs2bGjaS/u/BQDNGNsBAJxzE/e1cBqS0QkhjN8VPwYgP8nTGvrJl8tlfP/738fTTz/d1GvbtPIJ2cplr9bKgX6y6nSj35PWGg8++CCuv/76CZceaYLgje2xLGvIb3M0juO05tUHlVIHZGXBG7FtOxjOM5LJZLb6DweNF6zqd8MMDAzgkksuwWuvvTahjKT91RpJ0Coa2cZYS3Devvbaa/jsZz/bjAHfBxQBALq6unYyxoYAMCFE61arH3vsMTz22GPQWoc/Ab8HWzDGTKlU+r1/t6n63XBKKezYsQNXXHEFBgYGmn51REKSLjgXNm/ejEsuuQTbtm2LY4yrBoDx8fEH/b+5bdvh1MiWyxxrYMFO9cf6GX+Izz3+49G5QA2bKVPN8zw88sgjuOaaazA4OEgBknScyY5141/3fevWrbjyyivxP//zP+E1YhrYxFJrwwKVmHBPMDMmlUqFQwSbdWmGavUMjiZ68Z3u7m7Yto1UKvUKgHEc2CnTtOjkui5++tOf4uabb8bg4GBDljYjJKlqBTqtdTjQ+2//9m/x61//ekIQauC5Ub3hYDRL0bbtP/uzgkxPT0/4hPvuu69RZZlSw4bYpNNpxTlnnPOBXC73J//u2OakBbNnbrzxRuzatSv8hqQASTpNMAPmzTffxN/93d/hjjvuiC07gx8TcrncC4yxQVTaG3US5sQ3LDhmMhlwzi3Oucnn8z+e5HWb2j3qeR5uvPFGXH311XjttdcOyCDbYWwcIdWix7TWGq7r4uWXX8ZXv/pV/PznP2/65VarMADI5/M3McYUr5iwNkJcZr3wxKOPPjrh7zPOOAOMMfgNqkoIAcuyHpRSugAcTMwem/7OPc/Dbbfdhp07d+LLX/4yTjvtNFiW1fbT50jnis6CKZfLeOihh/C1r30NTz/9dNwLjGhU2htLnPNHGGNMCGEcx0EqlQrbRONS98zxoYceAlD5QHp7e7Vt28xxnG2ZTCaYFhT7ci9KKdx///34yEc+gh/96EcYHx8/oKOGMkjSLoJjeffu3fjud7+LT3ziE3jqqafiDDxBBmIAIJ1OP2NZ1k6/vVH39fWFSUoc0wYDDalWBx9GNputXJ+Vc10sFm8CZ0DMF+SK2rx5M6688kp87GMfm3DZyU6rXnfSe+0kwXEspcRTTz2Fyy67DNdccw22bt3azM+81gtFlzDUpVLpOsaYDqrUQWdM3MdlQ4Jj8I2UzWZhW5bmgsNxnA22bY+Bhd32iVAoFHDnnXfinHPOwbXXXos9e/ZAKRVWRWaSScb9Ic5WuzYltPrnMhO13qPWOqyS7ty5E1/60pfwrne9Cw888ACKxWKz98tkB1dQpR62LOt3jDEIIbRt2+jq6oq9Sg00KDg+/PDD4dpzvb29xrZtbtv2qOe63/fDYuxV6yjP8zA4OIhvfetbOO+88/DDH/4QO3bsgOd5MwqQ7RZc2iWotNvnUkv1TCCtNaSU2L59O2699Va8853vxPe+9z0MDQ3F2vHCDvwwgoPsx0KIohBC2LZt5s2bF64Q9etf/7qpZazWkMskRHV3d2P3niEwzg3n4hat1Oexf9Bnoo7ecrmMZ599Fl/84hfxi1/8AhdffDHOPfdcLFu2DLlcDpzzjui4aef31uqqV7MPvry11sjn89i2bRs2bNiA//zP/8Szzz6bmMt1+KtzMVTOe4NKDJCMsZuBykITQgj09vYGz4+rqKGGBUcpJWzbRjabRSqV0m6pzFMp50237P5cKfVBVC7BmMhrmxYKBTzyyCN48sknsWrVKrz3ve/FX/zFX+Coo47C3LlzkclkIIQ4YOWX6oO2lYJMO3ZEtdL+n4ngswmqzUopjI+PY2RkBJs2bcJDDz2Eu+++G2+++WbSL/QWDPz+mW3bu4QQnHNuUqlUWKWOcdxlqGHB8Q9/+APOPPNMcM4xf948FPMFKKW0MeYbAD6IhGaPUaVSCS+++CJeeukl/NM//ROOPPJIXHDBBTjxxBOxfPlyLFu2DKlUCpZlQQgBzvmE5b9a7eQMTrp2CZBSylhWkK63IDNUSkFKiXw+jx07duCNN97A448/jl/96ld44403UCgUkv7ZBVkjR6Vp7RuMMS2E4I7jmMWLF4dPXL9+fUxF3K+h1ergRJvTMwc7rZ3adV2eSqVeK5fLP9ZafwQJzh6jtNYYHx/HU089haeeegq5XA69vb04/PDDsW7dOhxxxBFYtmwZ5s+fj2w2G1a/Wy04SikxNDSU9BNsRlzXxcaNG8NqWqtSSqFYLGJwcBBbtmzBli1bsHHjRuzatQsjIyPI5ydbETCxNCpx54eO42zlnHM/QKKvrw9AcmovDT97zzrrLDDGsHv3buzYsYOXy2VdKpWWKaW2GGMSHxhninOOdDqNnp6esMrdaowxGB4eRrFYjLsos8Y5x4IFC8LLe7bi5wFUvrDGxsZQKpXaIQuOXpv6MMdxBizL4plMRi9btgxLly4Nhx61feYIVLKu4FthcHBQu67LHcd5s1AoXAPgWgASLZA9TkdrjUKhkJgG8JmqdQ2RdqC1xq5du+IuBpkoqFJ/xbKsAcZYmDUuWLAgbD5IQmAEmtTeF2SPQ0ND2L59O3NdF56UXEn5vOd5R6NSvW6Pa4ISQmoJxjVudBznbUIIblmWcRzHrFixAkuWLIExJrYVeGppSkAKMpO+vj4IIQxjjPPKda0/2ozXJ4Q03FSJVrRq8nG/iYMFw3cWLlyYyI7ApgTH3//+9zDGQAiBpUuXIpPJKCGEyGazjzLGvovKN0qtBpVk7S1CyGSqz9VosAyyxusdx3nMzxpVOp3GihUrwg7M+++/v3mlnYGmBMfTTz89/GaYN28estksLMvSnHOeSqWudBznBVTaP6tnzrRmKzohJAiWCpVz+2nbtr/iz582lmUhl8thwYIFABD3smk1Na2dL/rmly5dCsdxjBCCcc5dz/P+BkBwuTPKFglpPbUSmbB3GsBl/lVJw2XJVqxYUXlSAqvUQJM7QVzXZcYYZDIZLFq0CJlMRgshRCaTeQHA5Zi8ek0ISbZa0S2oTn80nU4/X1muUah0Oo3FixYjk8kkZjZMLc3uITZaaxgYLFy4ELlczliWpRhjViaTuQ3AtwHYqAzvIYS0niBIeqhUp7+VSqVuAyA450oIga6uLiztXwpjDIt75Z2pNH34jJQy3H3Lli0Lpt4FAfJLnPN/Z4xRgCSkNTFUzl0HwB2pVOoqxpjgnGshBBzHwWGHHRZUo02SB7bHMrZQKQVjDBzHweGHH45sNmscx1FCCJ5Kpf5GCPE7TJ1BJq+BgpDOFW1vlKicuw+mUqkPcc65EEI7jmOy2SxWrVoFx3ESXZ0OxNobfO6554IxhsHBQezatQulUolLKbXneT1KqfVSypOxPz0nhCSbZIzZxpg/OI5znhCixDlnlmXpdDqNxYsXY8mSJQBQMzD+5je/aXZ5pxRr0AmWNVu0aBFc18Xw8LBGJZvdZ4x5J2Psv40xp4ICJCFJJwHYxphHbNu+UAhR5Jxzy7J0KpVCb28vW7JkiQEqUzuTFghriXXK3u9///twte3ly5ejp6cHjuNoIQSzbXvEcZwLGGO/wf4qNlWnCWm+6WqYQVV6vW3b77QsayxSnUZPTw9WrlxpAITLrrWC2OczB7NnjDFYuXIluru7gzGQ3LKssVQq9S4At6Gy8yk4EhI/E/mtUDk3f+Y4zrsty8r7Yxm14zjo7u7G6tWrJ6xJ2SpiD44AsGHDhnAQ6KpVq4IAqYUQTAjhpdPpDwO4BpUxUwyV8VM0e4aQ5qg1NVD5vy0Af59KpT4khJDVGePatWsrG/CXImsliQowZ599drgW4muvvYZ9+/ahXC4zKSXXWqtSqfRXAH4CIIc2WeqMkBYUVKM9AB9JpVI/8wd4a3+lHfT09GDNmjUAKm2MDz74YJzlPSSJyBwDv/3tb8MMcs2aNejt7UUqlQoGiot0Ov3vAE4B8AQq31gGU2eRU02GJ6QTHew5EH1+UCe2UTkHTwsCoz9f2vidL2HG2KqBEUhosDj77LNhWRYYY9i+fTsGBwdZsVg0SilhjFFKKdt13b8H8AXsH3TKMf37CR6ntkvSqaLXbZrpNZyiVww0AP7esqyvCyEU5zyc+ZLJZLBw4UL09/eH1yNq1cAIJDQ4ApUxkMEFq4aHh7F161a4rgulFPcv1IVSqXQagO8COM7/t5kGSWD/ZSIJIbVpVM6RYBjdMwA+6zjOI/65KYQQyrIsOI6DlStXoq+vLxzg/dvf/ja+ktdBYscOBr1anHPW19dncrkctmzZgkKhoMvlMlNKsUwm8/+klCd7nvc5AF8F0O3/ezRIThYEg2/DxH5BENIEwTkQPU+C5qogPuwB8E3Lsm7ys0TGOUewiEQul8Nhhx2GdDodjjxp9cAIJKzNsRattTHGIJVK4cgjj8TChQuRSqWMbdtaCCEsy/LS6fT1AN4K4FYAZVQ+VI5KG0k0MFYHQgqMpJMF13QJbmv/h6NyDo0C+EcAR9u2fYNlWarSGS2MZVkmnU5jwYIFbN26dWFgbJfL4QIJzhyB/dmjUgq2bYMxhmXLlmHu3Ll48803USgUVKlUYlprnslkXtdaf6pcLn8XlbbIDwDIcM6htQ6C5Eyr3IR0giBbDJbGCUZ/DAP4FwD/aFnWTn8EiRBCaM65SqfTyGazWL58Oevq6gqSD2aSuCjjLCQ6OEYF+50xxrq6usxRRx2FgYEBbN++3Ugpled5nDGGdDr9stb6Y67rXg/gMq31hwEsjWyKAiXpdNFRHgL7g+I2ALcA+Klt27sBIFi5m3OubNuGZVno7+8PL4gVbrDNAiPQQsHh7LPPDm/btg2gcllRz/Owa9cu7N69G57nwfM8rrWG1lorpZhSqkcp9Q4AnwDwvwDMiVyO1KDSPsmqfgLUJklaXdC2HmSHFiYe06MAngXwHcbY7yzLGgcqQdG/GJ5xHAeWZWHhwoWsv7/fCFGJpdUreBtjwtpeK8ydnk7LZI5RnudBCAHOOWzbxrJly7BgwQIMDg5iaGhISynheR73J76PKqXuMcbc47ruYgCnGWMuA3AygHmojNmKCqZERVUHzalQLziJQxAEgf3thsEPGGMiEshGUOl5/j6AP9i2PeBfERBCCM4YM5xzbVlWEBTR398Py7LCDQTTAYP/A9A2bY2BlsmKopljVDAeMvhxXRdDQ0PYvXs3XNeFlDKYYaO11iYYf+V5Xh+A1QDOA3Cuf3su9vd4TyuSgZIO1+xj4SBeL49KMHwFwIMAfgNgS1BtZoyBc84YYzyY4cI5h+M4WLhwIRYvXowgUwQQjl8EDgyG7ZAtRrVMcJzOeeedF46LBCrfbPv27cPQ0BBGR0eDXjTmeZ7wx0lqYP+HrZTKGWN6ASwCsBaVsZOr/b8XoTJlUWBiDz/H/sGxduRv4MDqea0hE6h6DiZ5rB4m+6xr3T/dcw/1uJnpTKbJ7qt1f/X+nGx0wkzLXL396T6Pg9kXU01C0Jh85anosVHrtgRQBLALwCCAzQCeB/AigAHG2LAQIg+EwRAA4Pc8a8uyjBAClmVh7ty5mDdvHubMmTMhANdaNGLDhg0H8dZbT9sEx8D5558ffvhBoJRSYt++fRgeHsbo6Cg8z4PWmimluOd5TGutGKt0thljGADjHxgMlaXcba11EPyi87mDYGcBSGPi5WWjJ8LBBsdGBMipmgYmCyIHe3um5ag22XueyX3B/qwOkLUC+UwvPD+T+w9W9WvXCsJF1A6g0epy9HgK7lOMMSmEcIMa1IQXrvzNjDFCCBEMgzOc8zAg9vb2sjlz5hjLqrS0Be2JUsqWnuUyG20XHAMXXHBBGCQDjDForVEsFrFv3z6MjY1hbGwMnudBSsm01szvzAnHfhljdDDWMlqlqN5urb+pyk0O1UyPnWiTEmOMcb+ODMbAAO1nikYIYYJruHR3d6O7uxs9PT1Ip9OIdrAEtNa47777GvLeWkVLdsjMhFIqrAYEnTcAwDlHLpdDLpcLl2yXUsJ1XVMqlUyhUEC5XNblchnlchmu68J1XRYMbvUDZRgNg0DIIhGyOlgCzQuUlT54Csq11Ppc4txOIHJsaFQyvJk8F0DlePZnq8BfEUc7jmNSqRSCn0wmg0wmA7/XmTHGTHRb1T3OQCU4drq2DY4RTCkVXuWMMTZhKBBQGRpk2za6uroO+Ge/ehFUucMhQMHtIJuMPif4v+g2am13tmq9RvR39e2pyjTTx2Zy/0zLHDiYYFPjuROaKWpta7r7Il9wE36i91U/71DLP2kZKncAfpNOrdecrJxVP2aaL+cJH0A0CBpjwsBJOiM4Tviw169fP+HB888/P+zxriWoriBMysyEHyHEAYEo+nuq27X+3l9oM21rV83gWPlj0iA53evO9PEEmbagUwWvmQShyZ43m9eb6v6pAnf0dtCWOFlArKW6Y+X+++/H+eefH/zZMh96M3RCcJzSAw88MOljF154IQCguhpCSFLUOjajg7GDdsMLLrgghtK1to4PjlOZbFBrpzdUJ8EJJ5xQ8/6nnnqqySWJx2TB7v777z+o+8nk2jY4durwg07RKUGwGaaqPRFCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYSQjvX/AVUtDMH1QKkCAAAAAElFTkSuQmCC"
 
 class StateManager:
     """מחלקה לניהול מצב התוכנה עם זיהוי נכון של מיקום הקובץ"""
@@ -301,8 +304,9 @@ class MemoryManager:
         current_time = time.time()
         memory_usage = self.get_memory_usage()
         
+        # ניקוי רק אם באמת נדרש (זיכרון גבוה או זמן רב)
         return (memory_usage > self.memory_threshold or 
-                current_time - self.last_cleanup > self.cleanup_interval)
+                current_time - self.last_cleanup > self.cleanup_interval * 2)  # הכפלת הזמן
     
     def cleanup_memory(self):
         """ביצוע ניקוי זיכרון"""
@@ -326,13 +330,492 @@ class MemoryManager:
         except:
             return {'rss_mb': 0, 'vms_mb': 0, 'percent': 0}
 
+class AnimationManager:
+    """מנהל אנימציות מרכזי לכל האפליקציה"""
+    
+    def __init__(self):
+        self.animations = {}  # מילון לשמירת אנימציות פעילות
+        self.animation_groups = {}  # מילון לשמירת קבוצות אנימציות
+        self.animation_cache = {}  # cache לאנימציות שנוצרו
+        self.max_concurrent_animations = 10  # הגבלת מספר אנימציות בו-זמניות
+        
+    def create_fade_animation(self, widget, duration=300, start_opacity=0, end_opacity=1):
+        """יצירת אנימציית fade in/out"""
+        try:
+            # בדיקה אם יש כבר אנימציה פעילה לווידג'ט זה
+            widget_id = id(widget)
+            if widget_id in self.animations:
+                self.animations[widget_id].stop()
+            
+            # יצירת אנימציה חדשה
+            animation = QPropertyAnimation(widget, b"windowOpacity")
+            animation.setDuration(duration)
+            animation.setStartValue(start_opacity)
+            animation.setEndValue(end_opacity)
+            animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            # שמירה במילון האנימציות
+            self.animations[widget_id] = animation
+            
+            # ניקוי האנימציה כשהיא מסתיימת
+            animation.finished.connect(lambda: self._cleanup_animation(widget_id))
+            
+            return animation
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת אנימציית fade: {e}")
+            return None
+    
+    def create_slide_animation(self, widget, duration=300, start_pos=None, end_pos=None):
+        """יצירת אנימציית slide"""
+        try:
+            widget_id = id(widget)
+            if widget_id in self.animations:
+                self.animations[widget_id].stop()
+            
+            # קביעת מיקומים ברירת מחדל
+            if start_pos is None:
+                start_pos = widget.pos()
+            if end_pos is None:
+                end_pos = widget.pos()
+            
+            animation = QPropertyAnimation(widget, b"pos")
+            animation.setDuration(duration)
+            animation.setStartValue(start_pos)
+            animation.setEndValue(end_pos)
+            animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            self.animations[widget_id] = animation
+            animation.finished.connect(lambda: self._cleanup_animation(widget_id))
+            
+            return animation
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת אנימציית slide: {e}")
+            return None
+    
+    def create_scale_animation(self, widget, duration=200, start_scale=1.0, end_scale=1.05):
+        """יצירת אנימציית scale (הגדלה/הקטנה)"""
+        try:
+            widget_id = id(widget)
+            if widget_id in self.animations:
+                self.animations[widget_id].stop()
+            
+            # יצירת אנימציה לגודל
+            animation = QPropertyAnimation(widget, b"geometry")
+            animation.setDuration(duration)
+            
+            # חישוב גיאומטריה חדשה
+            current_rect = widget.geometry()
+            center = current_rect.center()
+            
+            # גיאומטריה התחלתית
+            start_width = int(current_rect.width() * start_scale)
+            start_height = int(current_rect.height() * start_scale)
+            start_rect = QRect(
+                center.x() - start_width // 2,
+                center.y() - start_height // 2,
+                start_width,
+                start_height
+            )
+            
+            # גיאומטריה סופית
+            end_width = int(current_rect.width() * end_scale)
+            end_height = int(current_rect.height() * end_scale)
+            end_rect = QRect(
+                center.x() - end_width // 2,
+                center.y() - end_height // 2,
+                end_width,
+                end_height
+            )
+            
+            animation.setStartValue(start_rect)
+            animation.setEndValue(end_rect)
+            animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            self.animations[widget_id] = animation
+            animation.finished.connect(lambda: self._cleanup_animation(widget_id))
+            
+            return animation
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת אנימציית scale: {e}")
+            return None
+    
+    def create_progress_animation(self, progress_bar, start_value, end_value, duration=1000):
+        """יצירת אנימציה למד התקדמות"""
+        try:
+            widget_id = id(progress_bar)
+            if widget_id in self.animations:
+                self.animations[widget_id].stop()
+            
+            animation = QPropertyAnimation(progress_bar, b"value")
+            animation.setDuration(duration)
+            animation.setStartValue(start_value)
+            animation.setEndValue(end_value)
+            animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            self.animations[widget_id] = animation
+            animation.finished.connect(lambda: self._cleanup_animation(widget_id))
+            
+            return animation
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת אנימציית progress: {e}")
+            return None
+    
+    def animate_button_click(self, button):
+        """אנימציה ללחיצה על כפתור"""
+        try:
+            # אנימציה קצרה של הקטנה והגדלה
+            scale_down = self.create_scale_animation(button, duration=100, start_scale=1.0, end_scale=0.95)
+            scale_up = self.create_scale_animation(button, duration=100, start_scale=0.95, end_scale=1.0)
+            
+            if scale_down and scale_up:
+                # יצירת רצף אנימציות
+                group = QSequentialAnimationGroup()
+                group.addAnimation(scale_down)
+                group.addAnimation(scale_up)
+                
+                widget_id = id(button)
+                self.animation_groups[widget_id] = group
+                group.finished.connect(lambda: self._cleanup_animation_group(widget_id))
+                
+                group.start()
+                return group
+            
+        except Exception as e:
+            print(f"שגיאה באנימציית לחיצת כפתור: {e}")
+            return None
+    
+    def animate_tab_transition(self, tab_widget, from_index, to_index):
+        """אנימציה למעבר בין טאבים"""
+        try:
+            # אנימציה פשוטה של fade out ו fade in
+            current_widget = tab_widget.widget(from_index)
+            new_widget = tab_widget.widget(to_index)
+            
+            if current_widget and new_widget:
+                fade_out = self.create_fade_animation(current_widget, duration=150, start_opacity=1, end_opacity=0)
+                fade_in = self.create_fade_animation(new_widget, duration=150, start_opacity=0, end_opacity=1)
+                
+                if fade_out and fade_in:
+                    group = QSequentialAnimationGroup()
+                    group.addAnimation(fade_out)
+                    group.addAnimation(fade_in)
+                    
+                    widget_id = id(tab_widget)
+                    self.animation_groups[widget_id] = group
+                    group.finished.connect(lambda: self._cleanup_animation_group(widget_id))
+                    
+                    group.start()
+                    return group
+            
+        except Exception as e:
+            print(f"שגיאה באנימציית מעבר טאבים: {e}")
+            return None
+    
+    def stop_all_animations(self):
+        """עצירת כל האנימציות הפעילות"""
+        try:
+            # עצירת אנימציות יחידות
+            for animation in self.animations.values():
+                if animation:
+                    animation.stop()
+            
+            # עצירת קבוצות אנימציות
+            for group in self.animation_groups.values():
+                if group:
+                    group.stop()
+            
+            # ניקוי המילונים
+            self.animations.clear()
+            self.animation_groups.clear()
+            
+        except Exception as e:
+            print(f"שגיאה בעצירת אנימציות: {e}")
+    
+    def _cleanup_animation(self, widget_id):
+        """ניקוי אנימציה שהסתיימה"""
+        try:
+            if widget_id in self.animations:
+                del self.animations[widget_id]
+        except Exception as e:
+            print(f"שגיאה בניקוי אנימציה: {e}")
+    
+    def _cleanup_animation_group(self, widget_id):
+        """ניקוי קבוצת אנימציות שהסתיימה"""
+        try:
+            if widget_id in self.animation_groups:
+                del self.animation_groups[widget_id]
+        except Exception as e:
+            print(f"שגיאה בניקוי קבוצת אנימציות: {e}")
+    
+    def get_active_animations_count(self):
+        """קבלת מספר האנימציות הפעילות"""
+        return len(self.animations) + len(self.animation_groups)
+    
+    def is_animation_running(self, widget):
+        """בדיקה האם יש אנימציה פעילה לווידג'ט"""
+        widget_id = id(widget)
+        return widget_id in self.animations or widget_id in self.animation_groups
+
+class IconManager:
+    """מנהל אייקונים לאפליקציה"""
+    
+    def __init__(self):
+        self.icon_cache = {}  # cache לאייקונים שנטענו
+        self.icon_theme = "default"
+        self.icon_size = 16
+        
+        # מיפוי שמות אייקונים לסמלים טקסטואליים
+        self.text_icons = {
+            'play': '▶️',
+            'pause': '⏸️',
+            'stop': '⏹️',
+            'folder': '📁',
+            'settings': '⚙️',
+            'download': '⬇️',
+            'upload': '⬆️',
+            'refresh': '🔄',
+            'sync': '🔄',
+            'check': '✅',
+            'error': '❌',
+            'warning': '⚠️',
+            'info': 'ℹ️',
+            'help': '❓',
+            'close': '✖️',
+            'minimize': '➖',
+            'maximize': '⬜',
+            'home': '🏠',
+            'search': '🔍',
+            'edit': '✏️',
+            'delete': '🗑️',
+            'add': '➕',
+            'remove': '➖',
+            'save': '💾',
+            'open': '📂',
+            'new': '📄',
+            'copy': '📋',
+            'cut': '✂️',
+            'paste': '📋',
+            'undo': '↶',
+            'redo': '↷',
+            'zoom_in': '🔍➕',
+            'zoom_out': '🔍➖',
+            'fullscreen': '⛶',
+            'exit_fullscreen': '⛶',
+            'menu': '☰',
+            'more': '⋯',
+            'up': '⬆️',
+            'down': '⬇️',
+            'left': '⬅️',
+            'right': '➡️',
+            'back': '⬅️',
+            'forward': '➡️',
+            'first': '⏮️',
+            'last': '⏭️',
+            'previous': '⏪',
+            'next': '⏩'
+        }
+        
+        # מיפוי לאייקונים של PyQt6
+        self.qt_icons = {
+            'folder': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DirIcon),
+            'file': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_FileIcon),
+            'help': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_MessageBoxQuestion),
+            'info': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_MessageBoxInformation),
+            'warning': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_MessageBoxWarning),
+            'error': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_MessageBoxCritical),
+            'refresh': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_BrowserReload),
+            'close': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogCloseButton),
+            'save': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogSaveButton),
+            'open': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogOpenButton),
+            'apply': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogApplyButton),
+            'cancel': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogCancelButton),
+            'ok': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_DialogOkButton),
+            'up': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowUp),
+            'down': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowDown),
+            'left': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowLeft),
+            'right': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowRight),
+            'back': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowBack),
+            'forward': QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ArrowForward)
+        }
+    
+    def get_icon(self, icon_name, size=None, color=None, theme="light"):
+        """קבלת אייקון לפי שם עם תמיכה בערכות נושא"""
+        try:
+            if size is None:
+                size = self.icon_size
+            
+            # התאמת צבע לערכת נושא אם לא צוין צבע ספציפי
+            if color is None:
+                color = "#FFFFFF" if theme == "dark" else "#333333"
+            
+            # בדיקה ב-cache
+            cache_key = f"{icon_name}_{size}_{color}_{theme}"
+            if cache_key in self.icon_cache:
+                return self.icon_cache[cache_key]
+            
+            icon = None
+            
+            # ניסיון לטעון אייקון מערכת של PyQt6
+            if icon_name in self.qt_icons:
+                icon = self.qt_icons[icon_name]
+            
+            # אם לא נמצא, יצירת אייקון טקסטואלי
+            if not icon or icon.isNull():
+                if icon_name in self.text_icons:
+                    icon = self.create_icon_from_text(
+                        self.text_icons[icon_name], 
+                        color, 
+                        size
+                    )
+                else:
+                    # fallback לטקסט פשוט
+                    fallback_color = "#CCCCCC" if theme == "dark" else "#666666"
+                    icon = self.create_icon_from_text(
+                        icon_name[:2].upper(), 
+                        fallback_color, 
+                        size
+                    )
+            
+            # שמירה ב-cache
+            if icon:
+                self.icon_cache[cache_key] = icon
+            
+            return icon
+            
+        except Exception as e:
+            print(f"שגיאה בטעינת אייקון {icon_name}: {e}")
+            # fallback לאייקון ברירת מחדל
+            fallback_color = "#999999" if theme == "light" else "#CCCCCC"
+            return self.create_icon_from_text("?", fallback_color, size or 16)
+    
+    def create_icon_from_text(self, text, color="#333333", size=16):
+        """יצירת אייקון מטקסט"""
+        try:
+            
+            # יצירת pixmap
+            pixmap = QPixmap(size, size)
+            pixmap.fill(QColor(0, 0, 0, 0))  # רקע שקוף
+            
+            # יצירת painter
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            
+            # הגדרת גופן
+            font = QFont()
+            font.setPixelSize(int(size * 0.7))  # 70% מגודל האייקון
+            font.setBold(True)
+            painter.setFont(font)
+            
+            # הגדרת צבע
+            painter.setPen(QColor(color))
+            
+            # ציור הטקסט במרכז
+            painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
+            
+            painter.end()
+            
+            return QIcon(pixmap)
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת אייקון מטקסט: {e}")
+            return QIcon()  # אייקון ריק
+    
+    def load_system_icon(self, icon_name):
+        """טעינת אייקון מערכת"""
+        try:
+            if icon_name in self.qt_icons:
+                return self.qt_icons[icon_name]
+            return QIcon()
+        except Exception as e:
+            print(f"שגיאה בטעינת אייקון מערכת: {e}")
+            return QIcon()
+    
+    def cache_icon(self, name, icon):
+        """שמירת אייקון ב-cache"""
+        try:
+            if icon and not icon.isNull():
+                self.icon_cache[name] = icon
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בשמירת אייקון ב-cache: {e}")
+            return False
+    
+    def clear_cache(self):
+        """ניקוי cache האייקונים"""
+        try:
+            self.icon_cache.clear()
+            return True
+        except Exception as e:
+            print(f"שגיאה בניקוי cache: {e}")
+            return False
+    
+    def set_icon_size(self, size):
+        """הגדרת גודל אייקון ברירת מחדל"""
+        try:
+            if 8 <= size <= 128:  # הגבלת טווח סביר
+                self.icon_size = size
+                # ניקוי cache כדי שהאייקונים ייטענו בגודל החדש
+                self.clear_cache()
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בהגדרת גודל אייקון: {e}")
+            return False
+    
+    def get_available_icons(self):
+        """קבלת רשימת אייקונים זמינים"""
+        try:
+            available = set()
+            available.update(self.text_icons.keys())
+            available.update(self.qt_icons.keys())
+            return sorted(list(available))
+        except Exception as e:
+            print(f"שגיאה בקבלת רשימת אייקונים: {e}")
+            return []
+    
+    def create_button_with_icon(self, text, icon_name, parent=None, theme="light"):
+        """יצירת כפתור עם אייקון"""
+        try:
+            button = QPushButton(text, parent)
+            icon = self.get_icon(icon_name, theme=theme)
+            if icon and not icon.isNull():
+                button.setIcon(icon)
+                button.setIconSize(QSize(self.icon_size, self.icon_size))
+            return button
+        except Exception as e:
+            print(f"שגיאה ביצירת כפתור עם אייקון: {e}")
+            return QPushButton(text, parent)
+    
+    def update_icons_for_theme(self, theme="light"):
+        """עדכון כל האייקונים בcache לערכת נושא חדשה"""
+        try:
+            # ניקוי cache כדי לאלץ יצירה מחדש עם הצבעים החדשים
+            old_cache = self.icon_cache.copy()
+            self.icon_cache.clear()
+            
+            # יצירה מחדש של אייקונים נפוצים עם הצבעים החדשים
+            common_icons = ['play', 'pause', 'stop', 'folder', 'settings', 'download', 'sync', 'refresh']
+            for icon_name in common_icons:
+                self.get_icon(icon_name, theme=theme)
+            
+            return True
+        except Exception as e:
+            print(f"שגיאה בעדכון אייקונים לערכת נושא: {e}")
+            return False
+
 class WorkerThread(QThread):
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
     manual_selection = pyqtSignal()
-    download_progress = pyqtSignal(str, int)  # שם קובץ ואחוז התקדמות
+    download_progress = pyqtSignal(str, int, float, int, int)  # שם קובץ, אחוז, מהירות, קבצים שהושלמו, סה"כ קבצים
     memory_info = pyqtSignal(dict)  # מידע על זיכרון
+    stats_update = pyqtSignal(dict)  # עדכון סטטיסטיקות
     
     def __init__(self, task_type, *args):
         super().__init__()
@@ -349,10 +832,28 @@ class WorkerThread(QThread):
         
         # הגדרות session משופרות
         self.session.headers.update({
-            'User-Agent': 'OtzariaSync/1.0',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         })
+        
+        # הגדרת proxy מהמערכת
+        try:
+            import urllib.request
+            proxy_handler = urllib.request.ProxyHandler()
+            proxy_dict = proxy_handler.proxies
+            if proxy_dict:
+                self.session.proxies.update(proxy_dict)
+        except:
+            pass
+        
+        # הגדרת SSL - פחות מחמיר
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        self.session.verify = False  # זהירות: פחות בטוח אבל עוזר עם בעיות SSL
         
         # הגדרת timeout וretries
         from requests.adapters import HTTPAdapter
@@ -381,131 +882,135 @@ class WorkerThread(QThread):
     def load_manifests(self):
         global LOCAL_PATH
         
-        self.stop_search = False
-        
-        def validate_otzaria_folder(path):
-            """בדיקה שהתיקיה מכילה את כל הקבצים והתיקיות הנדרשות"""
-            required_items = {
-                "אוצריא": "folder",
-                "links": "folder", 
-                "otzaria.exe": "file",
-                MANIFEST_FILE_NAME: "file"
-            }
-            
-            for item, item_type in required_items.items():
-                item_path = os.path.join(path, item)
-                if item_type == "folder" and not os.path.isdir(item_path):
-                    return False
-                elif item_type == "file" and not os.path.isfile(item_path):
-                    return False
-            return True
-        
-        # שלב 1: חיפוש בכונן C בלבד
-        self.status.emit("מחפש בכונן C...")
-        self.progress.emit(10)
-        
-        c_path = "C:\\אוצריא"
-        if os.path.exists(c_path) and validate_otzaria_folder(c_path):
-            LOCAL_PATH = c_path
-            self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
-            self.copy_manifests_and_finish()
-            return
-        
-        if self.stop_search:
-            return
-        
-        # שלב 2: חיפוש בקובץ העדפות
-        self.status.emit("לא נמצא בכונן C, מחפש בקובץ ההגדרות של תוכנת אוצריא...")
-        self.progress.emit(20)
-        
         try:
-            APP_DATA = os.getenv("APPDATA")
-            FILE_PATH = os.path.join(APP_DATA, "com.example", "otzaria", "app_preferences.isar")
+            self.stop_search = False
             
-            if os.path.exists(FILE_PATH):
-                with open(FILE_PATH, "rb") as f:
-                    content = f.read().decode("utf-8", errors="ignore")
-                pattern = re.compile(r'key-library-path.*?"([^"]+)"', re.DOTALL)
-                m = pattern.search(content)
-                if m:
-                    preferences_path = m.group(1).replace("/", "\\")
-                    if os.path.exists(preferences_path) and validate_otzaria_folder(preferences_path):
-                        LOCAL_PATH = preferences_path
-                        self.status.emit(f"נמצאה תיקיית אוצריא מקובץ ההגדרות של תוכנת אוצריא: {LOCAL_PATH}")
-                        self.copy_manifests_and_finish()
-                        return
-        except Exception as e:
-            self.status.emit(f"שגיאה בקריאת קובץ ההגדרות של תוכנת אוצריא.: {str(e)}")
-        
-        if self.stop_search:
-            return
-        
-        # שלב 3: חיפוש בתיקיות הבסיסיות של כל הכוננים
-        self.status.emit("מחפש בתיקיות הבסיסיות של כל הכוננים...")
-        self.progress.emit(40)
-        
-        drives = [f"{chr(i)}:\\" for i in range(ord('A'), ord('Z')+1) if os.path.exists(f"{chr(i)}:\\")]
-        
-        for drive in drives:
-            # בדיקת השהיה
-            while self.is_paused and not self.stop_search:
-                self.status.emit("פעולה מושהית...")
-                time.sleep(0.5)
+            def validate_otzaria_folder(path):
+                """בדיקה שהתיקיה מכילה את כל הקבצים והתיקיות הנדרשות"""
+                required_items = {
+                    "אוצריא": "folder",
+                    "links": "folder", 
+                    "otzaria.exe": "file",
+                    MANIFEST_FILE_NAME: "file"
+                }
+                
+                for item, item_type in required_items.items():
+                    item_path = os.path.join(path, item)
+                    if item_type == "folder" and not os.path.isdir(item_path):
+                        return False
+                    elif item_type == "file" and not os.path.isfile(item_path):
+                        return False
+                return True
+            
+            # שלב 1: חיפוש בכונן C בלבד
+            self.status.emit("מחפש בכונן C...")
+            self.progress.emit(10)
+            
+            c_path = "C:\\אוצריא"
+            if os.path.exists(c_path) and validate_otzaria_folder(c_path):
+                LOCAL_PATH = c_path
+                self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
+                self.copy_manifests_and_finish()
+                return
             
             if self.stop_search:
                 return
-            self.status.emit(f"מחפש בכונן {drive}")
-            try:
-                otzaria_path = os.path.join(drive, "אוצריא")
-                if os.path.exists(otzaria_path) and validate_otzaria_folder(otzaria_path):
-                    LOCAL_PATH = otzaria_path
-                    self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
-                    self.copy_manifests_and_finish()
-                    return
-            except:
-                continue
-        
-        if self.stop_search:
-            return
-        
-        # שלב 4: חיפוש בכל המחשב + אפשרות בחירה ידנית
-        self.status.emit("מחפש בכל המחשב... (ניתן לבחור ידנית)")
-        self.progress.emit(60)
-        
-        # שליחת signal לאפשרות בחירה ידנית
-        self.manual_selection.emit()
-        
-        # המשך חיפוש בכל המחשב
-        for drive in drives:
-            # בדיקת השהיה
-            while self.is_paused and not self.stop_search:
-                self.status.emit("פעולה מושהית...")
-                time.sleep(0.5)
             
-            if self.stop_search:
-                return
-            self.status.emit(f"מחפש בכל קבצי כונן {drive}")
+            # שלב 2: חיפוש בקובץ העדפות
+            self.status.emit("לא נמצא בכונן C, מחפש בקובץ ההגדרות של תוכנת אוצריא...")
+            self.progress.emit(20)
+            
             try:
-                for root, dirs, files in os.walk(drive):
-                    # בדיקת השהיה בלולאה הפנימית
-                    while self.is_paused and not self.stop_search:
-                        self.status.emit("פעולה מושהית...")
-                        time.sleep(0.5)
-                    
-                    if self.stop_search:
-                        return
-                    if "אוצריא" in dirs:
-                        potential_path = os.path.join(root, "אוצריא")
-                        if validate_otzaria_folder(potential_path):
-                            LOCAL_PATH = potential_path
-                            self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
+                APP_DATA = os.getenv("APPDATA")
+                FILE_PATH = os.path.join(APP_DATA, "com.example", "otzaria", "app_preferences.isar")
+                
+                if os.path.exists(FILE_PATH):
+                    with open(FILE_PATH, "rb") as f:
+                        content = f.read().decode("utf-8", errors="ignore")
+                    pattern = re.compile(r'key-library-path.*?"([^"]+)"', re.DOTALL)
+                    m = pattern.search(content)
+                    if m:
+                        preferences_path = m.group(1).replace("/", "\\")
+                        if os.path.exists(preferences_path) and validate_otzaria_folder(preferences_path):
+                            LOCAL_PATH = preferences_path
+                            self.status.emit(f"נמצאה תיקיית אוצריא מקובץ ההגדרות של תוכנת אוצריא: {LOCAL_PATH}")
                             self.copy_manifests_and_finish()
                             return
-            except:
-                continue
+            except Exception as e:
+                self.status.emit(f"שגיאה בקריאת קובץ ההגדרות של תוכנת אוצריא.: {str(e)}")
+            
+            if self.stop_search:
+                return
+            
+            # שלב 3: חיפוש בתיקיות הבסיסיות של כל הכוננים
+            self.status.emit("מחפש בתיקיות הבסיסיות של כל הכוננים...")
+            self.progress.emit(40)
+            
+            drives = [f"{chr(i)}:\\" for i in range(ord('A'), ord('Z')+1) if os.path.exists(f"{chr(i)}:\\")]
+            
+            for drive in drives:
+                # בדיקת השהיה
+                while self.is_paused and not self.stop_search:
+                    self.status.emit("פעולה מושהית...")
+                    time.sleep(0.5)
+                
+                if self.stop_search:
+                    return
+                self.status.emit(f"מחפש בכונן {drive}")
+                try:
+                    otzaria_path = os.path.join(drive, "אוצריא")
+                    if os.path.exists(otzaria_path) and validate_otzaria_folder(otzaria_path):
+                        LOCAL_PATH = otzaria_path
+                        self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
+                        self.copy_manifests_and_finish()
+                        return
+                except:
+                    continue
+            
+            if self.stop_search:
+                return
+            
+            # שלב 4: חיפוש בכל המחשב + אפשרות בחירה ידנית
+            self.status.emit("מחפש בכל המחשב... (ניתן לבחור ידנית)")
+            self.progress.emit(60)
+            
+            # שליחת signal לאפשרות בחירה ידנית
+            self.manual_selection.emit()
+            
+            # המשך חיפוש בכל המחשב
+            for drive in drives:
+                # בדיקת השהיה
+                while self.is_paused and not self.stop_search:
+                    self.status.emit("פעולה מושהית...")
+                    time.sleep(0.5)
+                
+                if self.stop_search:
+                    return
+                self.status.emit(f"מחפש בכל קבצי כונן {drive}")
+                try:
+                    for root, dirs, files in os.walk(drive):
+                        # בדיקת השהיה בלולאה הפנימית
+                        while self.is_paused and not self.stop_search:
+                            self.status.emit("פעולה מושהית...")
+                            time.sleep(0.5)
+                        
+                        if self.stop_search:
+                            return
+                        if "אוצריא" in dirs:
+                            potential_path = os.path.join(root, "אוצריא")
+                            if validate_otzaria_folder(potential_path):
+                                LOCAL_PATH = potential_path
+                                self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
+                                self.copy_manifests_and_finish()
+                                return
+                except:
+                    continue
+            
+            # אם לא נמצא כלום
+            self.finished.emit(False, "לא נמצאה תיקיית אוצריא. אנא בחר את התיקיה ידנית")
         
-        # אם לא נמצא כלום
-        self.finished.emit(False, "לא נמצאה תיקיית אוצריא. אנא בחר את התיקיה ידנית")
+        except Exception as e:
+            self.finished.emit(False, f"שגיאה בחיפוש תיקיית אוצריא: {str(e)}")
 
     def copy_manifests_and_finish(self):
         """העתקת קבצי המניפסט וסיום"""
@@ -608,16 +1113,36 @@ class WorkerThread(QThread):
         # בדיקת חיבור אינטרנט משופרת
         def test_internet_connection():
             test_urls = [
-                "https://raw.githubusercontent.com",
-                "https://google.com", 
-                "https://github.com"
+                "https://github.com/zevisvei/otzaria-library"
             ]
             
             for url in test_urls:
                 try:
-                    response = self.session.get(url, timeout=10)
+                    # ניסיון ראשון עם הגדרות רגילות
+                    response = self.session.get(url, timeout=15)
                     if response.status_code == 200:
                         return True
+                except requests.exceptions.SSLError:
+                    # אם יש בעיית SSL, נסה בלי אימות
+                    try:
+                        response = self.session.get(url, timeout=15, verify=False)
+                        if response.status_code == 200:
+                            return True
+                    except:
+                        continue
+                except requests.exceptions.ProxyError:
+                    # אם יש בעיית proxy, נסה בלי proxy
+                    try:
+                        temp_session = requests.Session()
+                        temp_session.headers.update(self.session.headers)
+                        temp_session.proxies = {}
+                        response = temp_session.get(url, timeout=15, verify=False)
+                        if response.status_code == 200:
+                            # אם עבד בלי proxy, עדכן את ה-session הראשי
+                            self.session.proxies = {}
+                            return True
+                    except:
+                        continue
                 except:
                     continue
             return False
@@ -747,13 +1272,36 @@ class WorkerThread(QThread):
                         progress = 10 + (completed_files / len(all_file_tasks)) * 80
                         self.progress.emit(int(progress))
                         
+                        # חישוב מהירות נוכחית
+                        elapsed_time = time.time() - start_time
+                        current_speed = 0
+                        if elapsed_time > 0:
+                            current_speed = total_downloaded_mb / elapsed_time
+                        
+                        # שליחת עדכון התקדמות מפורט
+                        self.download_progress.emit(
+                            book_name, 
+                            int(progress), 
+                            current_speed, 
+                            completed_files, 
+                            len(all_file_tasks)
+                        )
+                        
                         # הצגת סטטיסטיקות כל 10 קבצים
                         if completed_files % 10 == 0:
-                            elapsed_time = time.time() - start_time
                             if elapsed_time > 0:
-                                avg_speed = total_downloaded_mb / elapsed_time
                                 self.status.emit(f"הורדו {completed_files}/{len(all_file_tasks)} | "
-                                               f"מהירות: {avg_speed:.1f} MB/s")
+                                               f"מהירות: {current_speed:.1f} MB/s")
+                                
+                            # שליחת עדכון סטטיסטיקות
+                            stats_data = {
+                                'total_files': len(all_file_tasks),
+                                'completed_files': completed_files,
+                                'total_size_mb': total_downloaded_mb,
+                                'current_speed': current_speed,
+                                'elapsed_time': elapsed_time
+                            }
+                            self.stats_update.emit(stats_data)
             
             all_failed_files.extend(failed_files)
                         
@@ -889,8 +1437,8 @@ class WorkerThread(QThread):
             final_memory = self.memory_manager.get_memory_info()
             
             self.progress.emit(100)
-            success_message = ("העדכון הושלם בהצלחה!!\n\n"
-                             "כל הספרים נכנסו לתוך תוכנת אוצריא\n")
+            success_message = ("הסנכרון הושלם בהצלחה!!\n"
+                                "כל הספרים נכנסו לתוך תוכנת אוצריא")
             self.finished.emit(True, success_message)
             
         except Exception as e:
@@ -903,6 +1451,1371 @@ class WorkerThread(QThread):
         pixmap = QPixmap()
         pixmap.loadFromData(base64.b64decode(icon_base64))
         return QIcon(pixmap)
+class AnimatedButton(QPushButton):
+    """כפתור עם אנימציות חלקות משופרות"""
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        
+        # הפניה למנהל האנימציות (יוגדר מאוחר יותר)
+        self.animation_manager = None
+        
+        # אנימציות בסיסיות (fallback)
+        self.geometry_animation = QPropertyAnimation(self, b"geometry")
+        self.geometry_animation.setDuration(200)
+        self.geometry_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+        # אנימציית שקיפות
+        self.opacity_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.opacity_animation.setDuration(150)
+        self.opacity_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+        # סגנונות
+        self.original_style = ""
+        self.hover_style = ""
+        self.disabled_style = ""
+        self.pressed_style = ""
+        
+        # מצבים
+        self.is_animating = False
+        self.hover_animation_active = False
+        
+        # הגדרות אנימציה
+        self.hover_scale = 1.02
+        self.click_scale = 0.98
+        self.animation_duration = 150
+        
+        # אפקטים ויזואליים
+        self.shadow_enabled = True
+        self.glow_enabled = False
+        
+    def set_animation_manager(self, animation_manager):
+        """הגדרת מנהל האנימציות"""
+        self.animation_manager = animation_manager
+    
+    def set_styles(self, original, hover, disabled=None, pressed=None):
+        """הגדרת סגנונות לכל המצבים"""
+        self.original_style = original
+        self.hover_style = hover
+        self.disabled_style = disabled or original
+        self.pressed_style = pressed or hover
+        self.setStyleSheet(original)
+    
+    def set_animation_settings(self, hover_scale=1.02, click_scale=0.98, duration=150):
+        """הגדרת פרמטרי אנימציה"""
+        self.hover_scale = hover_scale
+        self.click_scale = click_scale
+        self.animation_duration = duration
+    
+    def enable_shadow(self, enabled=True):
+        """הפעלה/כיבוי של אפקט צל"""
+        self.shadow_enabled = enabled
+        self._update_visual_effects()
+    
+    def enable_glow(self, enabled=True):
+        """הפעלה/כיבוי של אפקט זוהר"""
+        self.glow_enabled = enabled
+        self._update_visual_effects()
+    
+    def _update_visual_effects(self):
+        """עדכון אפקטים ויזואליים"""
+        try:
+            effects = []
+            
+            if self.shadow_enabled:
+                effects.append("box-shadow: 0 2px 4px rgba(0,0,0,0.1);")
+            
+            if self.glow_enabled and self.hover_animation_active:
+                effects.append("box-shadow: 0 0 10px rgba(66, 165, 245, 0.5);")
+            
+            # הוספת האפקטים לסגנון הנוכחי
+            current_style = self.styleSheet()
+            if effects:
+                effect_style = " ".join(effects)
+                # הוספה בזהירות כדי לא לשבור את הסגנון הקיים
+                if "box-shadow" not in current_style:
+                    current_style = current_style.rstrip('}') + effect_style + '}'
+            
+        except Exception as e:
+            print(f"שגיאה בעדכון אפקטים ויזואליים: {e}")
+    
+    def enterEvent(self, event):
+        """אירוע כניסה של העכבר"""
+        try:
+            if not self.isEnabled() or self.is_animating:
+                return
+            
+            self.hover_animation_active = True
+            
+            # החלפת סגנון
+            self.setStyleSheet(self.hover_style)
+            self._update_visual_effects()
+            
+            # אנימציית הגדלה
+            if self.animation_manager:
+                # שימוש במנהל האנימציות
+                animation = self.animation_manager.create_scale_animation(
+                    self, duration=self.animation_duration, 
+                    start_scale=1.0, end_scale=self.hover_scale
+                )
+                if animation:
+                    animation.start()
+            else:
+                # fallback לאנימציה בסיסית
+                self._animate_scale(1.0, self.hover_scale)
+            
+            super().enterEvent(event)
+            
+        except Exception as e:
+            print(f"שגיאה באירוע כניסת עכבר: {e}")
+            super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """אירוע יציאה של העכבר"""
+        try:
+            self.hover_animation_active = False
+            
+            # החלפת סגנון מיידית
+            self.setStyleSheet(self.original_style)
+            self._update_visual_effects()
+            
+            # ביטול כל האנימציות הפעילות
+            if hasattr(self, 'geometry_animation') and self.geometry_animation.state() == QPropertyAnimation.State.Running:
+                self.geometry_animation.stop()
+            
+            # אנימציית הקטנה חזרה
+            if self.animation_manager:
+                animation = self.animation_manager.create_scale_animation(
+                    self, duration=100,  # מהירות יותר לחזרה
+                    start_scale=self.hover_scale, end_scale=1.0
+                )
+                if animation:
+                    animation.start()
+            else:
+                self._animate_scale(self.hover_scale, 1.0)
+            
+            super().leaveEvent(event)
+            
+        except Exception as e:
+            print(f"שגיאה באירוע יציאת עכבר: {e}")
+            super().leaveEvent(event)
+    
+    def mousePressEvent(self, event):
+        """אירוע לחיצה על הכפתור"""
+        try:
+            if not self.isEnabled():
+                return
+            
+            # החלפת סגנון ללחיצה
+            if self.pressed_style:
+                self.setStyleSheet(self.pressed_style)
+            
+            # אנימציית לחיצה
+            if self.animation_manager:
+                self.animation_manager.animate_button_click(self)
+            else:
+                self._animate_click()
+            
+            super().mousePressEvent(event)
+            
+        except Exception as e:
+            print(f"שגיאה באירוע לחיצה: {e}")
+            super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """אירוע שחרור הכפתור"""
+        try:
+            # חזרה לסגנון hover אם העכבר עדיין מעל הכפתור
+            if self.underMouse() and self.isEnabled():
+                self.setStyleSheet(self.hover_style)
+            elif self.isEnabled():
+                self.setStyleSheet(self.original_style)
+            
+            super().mouseReleaseEvent(event)
+            
+        except Exception as e:
+            print(f"שגיאה באירוע שחרור: {e}")
+            super().mouseReleaseEvent(event)
+    
+    def changeEvent(self, event):
+        """אירוע שינוי מצב הכפתור"""
+        try:
+            if event.type() == event.Type.EnabledChange:
+                if self.isEnabled():
+                    # אנימציית הופעה
+                    self.setStyleSheet(self.original_style)
+                    if self.animation_manager:
+                        animation = self.animation_manager.create_fade_animation(
+                            self, duration=200, start_opacity=0.5, end_opacity=1.0
+                        )
+                        if animation:
+                            animation.start()
+                else:
+                    # אנימציית היעלמות
+                    self.setStyleSheet(self.disabled_style)
+                    if self.animation_manager:
+                        animation = self.animation_manager.create_fade_animation(
+                            self, duration=200, start_opacity=1.0, end_opacity=0.6
+                        )
+                        if animation:
+                            animation.start()
+            
+            super().changeEvent(event)
+            
+        except Exception as e:
+            print(f"שגיאה באירוע שינוי מצב: {e}")
+            super().changeEvent(event)
+    
+    def _animate_scale(self, start_scale, end_scale):
+        """אנימציית הגדלה/הקטנה בסיסית (fallback)"""
+        try:
+            if self.is_animating:
+                return
+            
+            self.is_animating = True
+            
+            # חישוב גיאומטריה
+            current_rect = self.geometry()
+            center = current_rect.center()
+            
+            end_width = int(current_rect.width() * end_scale)
+            end_height = int(current_rect.height() * end_scale)
+            end_rect = QRect(
+                center.x() - end_width // 2,
+                center.y() - end_height // 2,
+                end_width,
+                end_height
+            )
+            
+            # הגדרת אנימציה
+            self.geometry_animation.setStartValue(current_rect)
+            self.geometry_animation.setEndValue(end_rect)
+            self.geometry_animation.setDuration(self.animation_duration)
+            
+            # חיבור לסיום
+            self.geometry_animation.finished.connect(self._on_animation_finished)
+            
+            # הפעלה
+            self.geometry_animation.start()
+            
+        except Exception as e:
+            print(f"שגיאה באנימציית scale: {e}")
+            self.is_animating = False
+    
+    def _animate_click(self):
+        """אנימציית לחיצה בסיסית (fallback)"""
+        try:
+            # אנימציה קצרה של הקטנה והגדלה
+            QTimer.singleShot(0, lambda: self._animate_scale(1.0, self.click_scale))
+            QTimer.singleShot(100, lambda: self._animate_scale(self.click_scale, 1.0))
+            
+        except Exception as e:
+            print(f"שגיאה באנימציית לחיצה: {e}")
+    
+    def _on_animation_finished(self):
+        """קריאה חוזרת לסיום אנימציה"""
+        self.is_animating = False
+        try:
+            self.geometry_animation.finished.disconnect()
+        except:
+            pass
+    
+    def stop_animations(self):
+        """עצירת כל האנימציות"""
+        try:
+            self.is_animating = False
+            self.geometry_animation.stop()
+            self.opacity_animation.stop()
+            
+            if self.animation_manager:
+                # עצירת אנימציות במנהל
+                widget_id = id(self)
+                if widget_id in self.animation_manager.animations:
+                    self.animation_manager.animations[widget_id].stop()
+                if widget_id in self.animation_manager.animation_groups:
+                    self.animation_manager.animation_groups[widget_id].stop()
+                    
+        except Exception as e:
+            print(f"שגיאה בעצירת אנימציות: {e}")
+
+class EnhancedProgressBar(QProgressBar):
+    """מד התקדמות משופר עם אנימציות ומידע מפורט"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.animation_manager = None
+        self.current_file = ""
+        self.download_speed = 0
+        self.time_remaining = 0
+        self.files_completed = 0
+        self.total_files = 0
+        self.bytes_downloaded = 0
+        self.total_bytes = 0
+        self.start_time = None
+        self.last_update_time = time.time()
+        
+        # אנימציה לעדכון ערך
+        self.value_animation = QPropertyAnimation(self, b"value")
+        self.value_animation.setDuration(300)
+        self.value_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+    def set_animation_manager(self, animation_manager):
+        """הגדרת מנהל האנימציות"""
+        self.animation_manager = animation_manager
+        
+    def update_progress_animated(self, value):
+        """עדכון התקדמות עם אנימציה"""
+        try:
+            if self.value_animation.state() == QPropertyAnimation.State.Running:
+                self.value_animation.stop()
+            
+            self.value_animation.setStartValue(self.value())
+            self.value_animation.setEndValue(value)
+            self.value_animation.start()
+        except Exception as e:
+            # fallback לעדכון רגיל
+            self.setValue(value)
+    
+    def set_detailed_stats(self, **kwargs):
+        """עדכון סטטיסטיקות מפורטות"""
+        if 'current_file' in kwargs:
+            self.current_file = kwargs['current_file']
+        if 'download_speed' in kwargs:
+            self.download_speed = kwargs['download_speed']
+        if 'time_remaining' in kwargs:
+            self.time_remaining = kwargs['time_remaining']
+        if 'files_completed' in kwargs:
+            self.files_completed = kwargs['files_completed']
+        if 'total_files' in kwargs:
+            self.total_files = kwargs['total_files']
+        if 'bytes_downloaded' in kwargs:
+            self.bytes_downloaded = kwargs['bytes_downloaded']
+        if 'total_bytes' in kwargs:
+            self.total_bytes = kwargs['total_bytes']
+        if 'start_time' in kwargs:
+            self.start_time = kwargs['start_time']
+            
+        self.update_display_text()
+        
+    def update_display_text(self):
+        """עדכון הטקסט המוצג"""
+        try:
+            parts = []
+            
+            # אחוז התקדמות
+            parts.append(f"{self.value()}%")
+            
+            # קבצים
+            if self.total_files > 0:
+                parts.append(f"{self.files_completed}/{self.total_files} קבצים")
+            
+            # מהירות הורדה
+            if self.download_speed > 0:
+                parts.append(f"{self.download_speed:.1f} MB/s")
+            
+            # זמן נותר
+            if self.time_remaining > 0:
+                time_str = self.format_time_remaining(self.time_remaining)
+                parts.append(f"נותר: {time_str}")
+            
+            # גודל קבצים
+            if self.total_bytes > 0:
+                downloaded_str = self.format_file_size(self.bytes_downloaded)
+                total_str = self.format_file_size(self.total_bytes)
+                parts.append(f"{downloaded_str}/{total_str}")
+            
+            # קובץ נוכחי (רק אם יש מקום)
+            display_text = " | ".join(parts)
+            if len(display_text) < 100 and self.current_file:
+                # הצגת שם קובץ מקוצר
+                short_filename = self.current_file.split('/')[-1]
+                if len(short_filename) > 30:
+                    short_filename = short_filename[:27] + "..."
+                display_text += f" | {short_filename}"
+            
+            self.setFormat(display_text)
+            
+        except Exception as e:
+            # fallback לתצוגה בסיסית
+            self.setFormat(f"{self.value()}%")
+    
+    def format_time_remaining(self, seconds):
+        """פורמט זמן נותר"""
+        try:
+            if seconds < 60:
+                return f"{int(seconds)}ש"
+            elif seconds < 3600:
+                mins = int(seconds // 60)
+                secs = int(seconds % 60)
+                return f"{mins}:{secs:02d}"
+            else:
+                hours = int(seconds // 3600)
+                mins = int((seconds % 3600) // 60)
+                return f"{hours}:{mins:02d}:00"
+        except:
+            return "לא ידוע"
+    
+    def format_file_size(self, bytes_size):
+        """פורמט גודל קובץ"""
+        try:
+            if bytes_size < 1024:
+                return f"{bytes_size}B"
+            elif bytes_size < 1024**2:
+                return f"{bytes_size/1024:.1f}KB"
+            elif bytes_size < 1024**3:
+                return f"{bytes_size/(1024**2):.1f}MB"
+            else:
+                return f"{bytes_size/(1024**3):.1f}GB"
+        except:
+            return "0B"
+    
+    def reset_stats(self):
+        """איפוס כל הסטטיסטיקות"""
+        self.current_file = ""
+        self.download_speed = 0
+        self.time_remaining = 0
+        self.files_completed = 0
+        self.total_files = 0
+        self.bytes_downloaded = 0
+        self.total_bytes = 0
+        self.start_time = None
+        self.setValue(0)
+        self.setFormat("0%")
+    
+    def set_stats(self, speed=0, time_remaining=0, files_processed=0, total_files=0):
+        """מתודה לתאימות לאחור עם הקוד הישן"""
+        try:
+            self.set_detailed_stats(
+                download_speed=speed,
+                time_remaining=time_remaining,
+                files_completed=files_processed,
+                total_files=total_files
+            )
+        except Exception as e:
+            print(f"שגיאה בעדכון סטטיסטיקות progress bar (תאימות לאחור): {e}")
+
+
+
+class ThemeManager:
+    """מנהל ערכות נושא - מצב כהה/בהיר"""
+    
+    def __init__(self, settings):
+        self.settings = settings
+        self.current_theme = self.settings.value("theme", "light", type=str)
+        self.themes = {
+            "light": self._create_light_theme(),
+            "dark": self._create_dark_theme()
+        }
+    
+    def _create_light_theme(self):
+        """יצירת ערכת נושא בהירה"""
+        return {
+            "name": "light",
+            "background_color": "#FFFFFF",
+            "text_color": "#2E4057",
+            "primary_color": "#4CAF50",
+            "secondary_color": "#2196F3",
+            "accent_color": "#FF9800",
+            "button_colors": {
+                "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4CAF50, stop:1 #45a049)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2)",
+                "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
+                "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f44336, stop:1 #da190b)",
+                "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
+                "disabled": "#CCCCCC"
+            },
+            "progress_bar_colors": {
+                "background": "#F5F5F5",
+                "border": "#E0E0E0",
+                "chunk": "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4CAF50, stop:0.5 #66BB6A, stop:1 #4CAF50)"
+            },
+            "border_colors": {
+                "normal": "#CCCCCC",
+                "focus": "#2196F3",
+                "error": "#f44336"
+            },
+            "panel_colors": {
+                "background": "#F8F9FA",
+                "border": "#E0E0E0"
+            }
+        }
+    
+    def _create_dark_theme(self):
+        """יצירת ערכת נושא כהה"""
+        return {
+            "name": "dark",
+            "background_color": "#2B2B2B",
+            "text_color": "#FFFFFF",
+            "primary_color": "#66BB6A",
+            "secondary_color": "#42A5F5",
+            "accent_color": "#FFB74D",
+            "button_colors": {
+                "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66BB6A, stop:1 #4CAF50)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3)",
+                "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
+                "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #EF5350, stop:1 #f44336)",
+                "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
+                "disabled": "#555555"
+            },
+            "progress_bar_colors": {
+                "background": "#3C3C3C",
+                "border": "#555555",
+                "chunk": "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #66BB6A, stop:0.5 #4CAF50, stop:1 #66BB6A)"
+            },
+            "border_colors": {
+                "normal": "#555555",
+                "focus": "#42A5F5",
+                "error": "#EF5350"
+            },
+            "panel_colors": {
+                "background": "#3C3C3C",
+                "border": "#555555"
+            }
+        }
+    
+    def apply_theme(self, theme_name, widget):
+        """החלת ערכת נושא על ווידג'ט"""
+        try:
+            if theme_name not in self.themes:
+                theme_name = "light"
+            
+            theme = self.themes[theme_name]
+            self.current_theme = theme_name
+            
+            # החלת סגנון כללי על החלון הראשי
+            if hasattr(widget, 'setStyleSheet'):
+                main_style = self._generate_main_stylesheet(theme)
+                widget.setStyleSheet(main_style)
+            
+            # עדכון אייקונים לערכת הנושא החדשה
+            if hasattr(widget, 'icon_manager'):
+                widget.icon_manager.update_icons_for_theme(theme_name)
+            
+            # עדכון כל הכפתורים
+            self._update_buttons_theme(widget, theme)
+            
+            # עדכון מדי התקדמות
+            self._update_progress_bars_theme(widget, theme)
+            
+            # עדכון פאנלים
+            self._update_panels_theme(widget, theme)
+            
+            return True
+            
+        except Exception as e:
+            print(f"שגיאה בהחלת ערכת נושא: {e}")
+            return False
+    
+    def _generate_main_stylesheet(self, theme):
+        """יצירת stylesheet ראשי"""
+        return f"""
+            QMainWindow {{
+                background-color: {theme['background_color']};
+                color: {theme['text_color']};
+            }}
+            QLabel {{
+                color: {theme['text_color']};
+            }}
+            QTextEdit {{
+                background-color: {theme['panel_colors']['background']};
+                border: 1px solid {theme['border_colors']['normal']};
+                border-radius: 5px;
+                color: {theme['text_color']};
+            }}
+            QGroupBox {{
+                color: {theme['text_color']};
+                border: 2px solid {theme['border_colors']['normal']};
+                border-radius: 5px;
+                margin-top: 10px;
+                font-weight: bold;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }}
+            QTabWidget::pane {{
+                border: 1px solid {theme['border_colors']['normal']};
+                background-color: {theme['background_color']};
+            }}
+            QTabBar::tab {{
+                background-color: {theme['panel_colors']['background']};
+                color: {theme['text_color']};
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 5px;
+                border-top-right-radius: 5px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {theme['background_color']};
+                border-bottom: 2px solid {theme['primary_color']};
+            }}
+            QStatusBar {{
+                background-color: {theme['panel_colors']['background']};
+                color: {theme['text_color']};
+                border-top: 1px solid {theme['border_colors']['normal']};
+            }}
+        """
+    
+    def _update_buttons_theme(self, widget, theme):
+        """עדכון כפתורים לערכת נושא"""
+        try:
+            # חיפוש כל הכפתורים בווידג'ט
+            buttons = widget.findChildren(QPushButton)
+            for button in buttons:
+                if hasattr(button, 'set_styles'):
+                    # כפתור מונפש - עדכון הסגנונות
+                    self._update_animated_button_theme(button, theme)
+                else:
+                    # כפתור רגיל
+                    self._update_regular_button_theme(button, theme)
+        except Exception as e:
+            print(f"שגיאה בעדכון כפתורים: {e}")
+    
+    def _update_animated_button_theme(self, button, theme):
+        """עדכון כפתור מונפש לערכת נושא"""
+        try:
+            # זיהוי סוג הכפתור לפי הטקסט או המאפיינים
+            text = button.text().lower()
+            
+            if "טען" in text or "folder" in text:
+                color_key = "primary"
+            elif "הורד" in text or "download" in text:
+                color_key = "secondary"
+            elif "עדכן" in text or "sync" in text:
+                color_key = "accent"
+            elif "בטל" in text or "stop" in text:
+                color_key = "danger"
+            elif "השהה" in text or "pause" in text:
+                color_key = "warning"
+            else:
+                color_key = "primary"
+            
+            original_style = f"""
+                QPushButton {{
+                    background: {theme['button_colors'][color_key]};
+                    color: white;
+                    border: none;
+                    border-radius: 12px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    padding: 10px;
+                }}
+                QPushButton:disabled {{
+                    background-color: {theme['button_colors']['disabled']};
+                    color: #666666;
+                }}
+            """
+            
+            # יצירת hover style עם צבע מעט יותר בהיר
+            hover_style = original_style  # הסרת transform שגורם לשגיאות
+            
+            button.set_styles(original_style, hover_style)
+            
+        except Exception as e:
+            print(f"שגיאה בעדכון כפתור מונפש: {e}")
+    
+    def _update_regular_button_theme(self, button, theme):
+        """עדכון כפתור רגיל לערכת נושא"""
+        try:
+            style = f"""
+                QPushButton {{
+                    background-color: {theme['primary_color']};
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    padding: 5px 10px;
+                }}
+                QPushButton:hover {{
+                    background-color: {theme['secondary_color']};
+                }}
+                QPushButton:disabled {{
+                    background-color: {theme['button_colors']['disabled']};
+                    color: #666666;
+                }}
+            """
+            button.setStyleSheet(style)
+        except Exception as e:
+            print(f"שגיאה בעדכון כפתור רגיל: {e}")
+    
+    def _update_progress_bars_theme(self, widget, theme):
+        """עדכון מדי התקדמות לערכת נושא"""
+        try:
+            progress_bars = widget.findChildren(QProgressBar)
+            for pb in progress_bars:
+                style = f"""
+                    QProgressBar {{
+                        border: 2px solid {theme['progress_bar_colors']['border']};
+                        border-radius: 15px;
+                        text-align: center;
+                        font-weight: bold;
+                        font-size: 12px;
+                        background-color: {theme['progress_bar_colors']['background']};
+                        color: {theme['text_color']};
+                    }}
+                    QProgressBar::chunk {{
+                        background: {theme['progress_bar_colors']['chunk']};
+                        border-radius: 13px;
+                        margin: 2px;
+                    }}
+                """
+                pb.setStyleSheet(style)
+        except Exception as e:
+            print(f"שגיאה בעדכון מדי התקדמות: {e}")
+    
+    def _update_panels_theme(self, widget, theme):
+        """עדכון פאנלים לערכת נושא"""
+        try:
+            frames = widget.findChildren(QFrame)
+            for frame in frames:
+                if frame.frameStyle() == QFrame.Shape.StyledPanel:
+                    style = f"""
+                        QFrame {{
+                            background-color: {theme['panel_colors']['background']};
+                            border: 1px solid {theme['panel_colors']['border']};
+                            border-radius: 10px;
+                        }}
+                    """
+                    frame.setStyleSheet(style)
+        except Exception as e:
+            print(f"שגיאה בעדכון פאנלים: {e}")
+    
+    def toggle_theme(self, widget):
+        """החלפה בין ערכות נושא"""
+        try:
+            new_theme = "dark" if self.current_theme == "light" else "light"
+            success = self.apply_theme(new_theme, widget)
+            if success:
+                self.save_theme_preference()
+            return success
+        except Exception as e:
+            print(f"שגיאה בהחלפת ערכת נושא: {e}")
+            return False
+    
+    def get_current_theme_colors(self):
+        """קבלת צבעי ערכת הנושא הנוכחית"""
+        return self.themes.get(self.current_theme, self.themes["light"])
+    
+    def save_theme_preference(self):
+        """שמירת העדפת ערכת נושא"""
+        try:
+            self.settings.setValue("theme", self.current_theme)
+            self.settings.sync()
+            return True
+        except Exception as e:
+            print(f"שגיאה בשמירת העדפת ערכת נושא: {e}")
+            return False
+
+class FontManager:
+    """מנהל גודל גופן"""
+    
+    def __init__(self, settings):
+        self.settings = settings
+        self.base_font_size = 10
+        self.min_font_size = 8
+        self.max_font_size = 20
+        self.current_font_size = self.load_font_size()
+        
+    def load_font_size(self):
+        """טעינת גודל גופן משמור"""
+        try:
+            size = self.settings.value("font_size", self.base_font_size, type=int)
+            # וידוא שהגודל בטווח המותר
+            return max(self.min_font_size, min(self.max_font_size, size))
+        except Exception as e:
+            print(f"שגיאה בטעינת גודל גופן: {e}")
+            return self.base_font_size
+    
+    def increase_font_size(self, widget):
+        """הגדלת גודל גופן"""
+        try:
+            new_size = min(self.current_font_size + 1, self.max_font_size)
+            if new_size != self.current_font_size:
+                self.current_font_size = new_size
+                self.apply_font_to_widget(widget)
+                self.save_font_size()
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בהגדלת גופן: {e}")
+            return False
+    
+    def decrease_font_size(self, widget):
+        """הקטנת גודל גופן"""
+        try:
+            new_size = max(self.current_font_size - 1, self.min_font_size)
+            if new_size != self.current_font_size:
+                self.current_font_size = new_size
+                self.apply_font_to_widget(widget)
+                self.save_font_size()
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בהקטנת גופן: {e}")
+            return False
+    
+    def set_font_size(self, size, widget):
+        """הגדרת גודל גופן ספציפי"""
+        try:
+            if self.min_font_size <= size <= self.max_font_size:
+                self.current_font_size = size
+                self.apply_font_to_widget(widget)
+                self.save_font_size()
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בהגדרת גודל גופן: {e}")
+            return False
+    
+    def apply_font_to_widget(self, widget, size=None):
+        """החלת גודל גופן על ווידג'ט וכל הילדים שלו"""
+        try:
+            if size is None:
+                size = self.current_font_size
+            
+            # עדכון הגופן של הווידג'ט הראשי
+            font = widget.font()
+            font.setPointSize(size)
+            widget.setFont(font)
+            
+            # עדכון כל הווידג'טים הילדים
+            self._apply_font_recursive(widget, size)
+            
+            # התאמת גודל החלון אם נדרש
+            self._adjust_window_size(widget, size)
+            
+            return True
+            
+        except Exception as e:
+            print(f"שגיאה בהחלת גופן: {e}")
+            return False
+    
+    def _apply_font_recursive(self, widget, size):
+        """החלת גופן באופן רקורסיבי על כל הווידג'טים"""
+        try:
+            # רשימת סוגי ווידג'טים שצריכים עדכון גופן
+            font_widgets = (QLabel, QPushButton, QTextEdit, QGroupBox, 
+                          QTabWidget, QProgressBar, QStatusBar, QMenuBar, QMenu)
+            
+            for child in widget.findChildren(QWidget):
+                if isinstance(child, font_widgets):
+                    font = child.font()
+                    
+                    # התאמת גודל לפי סוג הווידג'ט
+                    if isinstance(child, QLabel):
+                        # בדיקה אם זו כותרת (גופן גדול יותר)
+                        if child.font().pointSize() > self.base_font_size + 5:
+                            font.setPointSize(size + 8)  # כותרת ראשית
+                        elif child.font().pointSize() > self.base_font_size + 2:
+                            font.setPointSize(size + 4)  # כותרת משנית
+                        else:
+                            font.setPointSize(size)
+                    elif isinstance(child, QPushButton):
+                        # כפתורים גדולים יותר
+                        if child.minimumHeight() > 50:
+                            font.setPointSize(size + 2)
+                        else:
+                            font.setPointSize(size)
+                    elif isinstance(child, QTextEdit):
+                        # טקסט עריכה - גופן קצת יותר קטן
+                        font.setPointSize(max(8, size - 1))
+                    else:
+                        font.setPointSize(size)
+                    
+                    child.setFont(font)
+                    
+        except Exception as e:
+            print(f"שגיאה בהחלת גופן רקורסיבי: {e}")
+    
+    def _adjust_window_size(self, widget, size):
+        """התאמת גודל חלון לגודל גופן"""
+        try:
+            if hasattr(widget, 'resize'):
+                # קבלת גודל מסך זמין
+                screen = QApplication.primaryScreen().availableGeometry()
+                
+                # חישוב יחס השינוי (מוגבל)
+                size_ratio = min(size / self.base_font_size, 1.5)  # מגביל את היחס
+                
+                # גודל נוכחי
+                current_size = widget.size()
+                
+                # חישוב גודל חדש
+                new_width = min(int(current_size.width() * size_ratio), int(screen.width() * 0.9))
+                new_height = min(int(current_size.height() * size_ratio), int(screen.height() * 0.9))
+                
+                # וידוא מינימום
+                new_width = max(new_width, 600)
+                new_height = max(new_height, 400)
+                
+                # עדכון גודל רק אם נדרש
+                if new_width != current_size.width() or new_height != current_size.height():
+                    widget.resize(new_width, new_height)
+                    
+                    # מרכוז החלון במסך
+                    x = (screen.width() - new_width) // 2
+                    y = (screen.height() - new_height) // 2
+                    widget.move(max(0, x), max(0, y))
+                    
+        except Exception as e:
+            print(f"שגיאה בהתאמת גודל חלון: {e}")
+    
+    def reset_to_default(self, widget):
+        """איפוס לגודל ברירת מחדל"""
+        try:
+            self.current_font_size = self.base_font_size
+            self.apply_font_to_widget(widget)
+            self.save_font_size()
+            return True
+        except Exception as e:
+            print(f"שגיאה באיפוס גודל גופן: {e}")
+            return False
+    
+    def save_font_size(self):
+        """שמירת גודל גופן"""
+        try:
+            self.settings.setValue("font_size", self.current_font_size)
+            self.settings.sync()
+            return True
+        except Exception as e:
+            print(f"שגיאה בשמירת גודל גופן: {e}")
+            return False
+    
+    def get_font_info(self):
+        """קבלת מידע על הגופן הנוכחי"""
+        return {
+            "current_size": self.current_font_size,
+            "base_size": self.base_font_size,
+            "min_size": self.min_font_size,
+            "max_size": self.max_font_size,
+            "can_increase": self.current_font_size < self.max_font_size,
+            "can_decrease": self.current_font_size > self.min_font_size
+        }
+
+class AdvancedStatsWidget(QGroupBox):
+    """ווידג'ט סטטיסטיקות מתקדם"""
+    def __init__(self, parent=None):
+        super().__init__("סטטיסטיקות מפורטות", parent)
+        self.collapsible = True
+        self.is_collapsed = False
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # כותרת עם כפתור הצגה/הסתרה
+        header_layout = QHBoxLayout()
+        self.toggle_button = QPushButton("🔽")
+        self.toggle_button.setMaximumWidth(30)
+        self.toggle_button.clicked.connect(self.toggle_visibility)
+        
+        header_label = QLabel("סטטיסטיקות מפורטות")
+        header_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
+        header_layout.addWidget(self.toggle_button)
+        
+        # תוכן הסטטיסטיקות
+        self.content_widget = QWidget()
+        content_layout = QGridLayout()
+        
+        # סטטיסטיקות בסיסיות
+        self.books_count_label = QLabel("0")
+        self.files_size_label = QLabel("0 MB")
+        self.last_sync_label = QLabel("אף פעם")
+        self.download_speed_label = QLabel("0 MB/s")
+        
+        # סטטיסטיקות מתקדמות
+        self.memory_usage_label = QLabel("0 MB")
+        self.active_threads_label = QLabel("0")
+        self.errors_count_label = QLabel("0")
+        self.elapsed_time_label = QLabel("00:00:00")
+        self.avg_speed_label = QLabel("0 MB/s")
+        self.eta_label = QLabel("לא ידוע")
+        
+        # הוספת תוויות לגריד
+        row = 0
+        stats_items = [
+            ("כמות ספרים:", self.books_count_label),
+            ("גודל קבצים:", self.files_size_label),
+            ("מהירות נוכחית:", self.download_speed_label),
+            ("מהירות ממוצעת:", self.avg_speed_label),
+            ("זמן שעבר:", self.elapsed_time_label),
+            ("זמן משוער לסיום:", self.eta_label),
+            ("שימוש זיכרון:", self.memory_usage_label),
+            ("חוטים פעילים:", self.active_threads_label),
+            ("שגיאות:", self.errors_count_label),
+            ("סנכרון אחרון:", self.last_sync_label)
+        ]
+        
+        for label_text, value_label in stats_items:
+            label = QLabel(label_text)
+            label.setStyleSheet("font-weight: bold;")
+            content_layout.addWidget(label, row, 0)
+            content_layout.addWidget(value_label, row, 1)
+            row += 1
+        
+        self.content_widget.setLayout(content_layout)
+        
+        # הוספה לlayout הראשי
+        layout.addLayout(header_layout)
+        layout.addWidget(self.content_widget)
+        
+        self.setLayout(layout)
+        
+    def toggle_visibility(self):
+        """החלפת מצב הצגה/הסתרה"""
+        try:
+            self.is_collapsed = not self.is_collapsed
+            self.content_widget.setVisible(not self.is_collapsed)
+            self.toggle_button.setText("🔼" if self.is_collapsed else "🔽")
+        except Exception as e:
+            print(f"שגיאה בהחלפת מצב תצוגה: {e}")
+    
+    def update_real_time_stats(self, stats_dict):
+        """עדכון סטטיסטיקות בזמן אמת"""
+        try:
+            if 'books_count' in stats_dict:
+                self.books_count_label.setText(str(stats_dict['books_count']))
+            if 'total_size_mb' in stats_dict:
+                self.files_size_label.setText(f"{stats_dict['total_size_mb']:.1f} MB")
+            if 'download_speed' in stats_dict:
+                self.download_speed_label.setText(f"{stats_dict['download_speed']:.1f} MB/s")
+            if 'avg_speed' in stats_dict:
+                self.avg_speed_label.setText(f"{stats_dict['avg_speed']:.1f} MB/s")
+            if 'memory_usage_mb' in stats_dict:
+                self.memory_usage_label.setText(f"{stats_dict['memory_usage_mb']:.1f} MB")
+            if 'active_threads' in stats_dict:
+                self.active_threads_label.setText(str(stats_dict['active_threads']))
+            if 'errors_count' in stats_dict:
+                self.errors_count_label.setText(str(stats_dict['errors_count']))
+            if 'elapsed_time' in stats_dict:
+                self.elapsed_time_label.setText(self._format_time(stats_dict['elapsed_time']))
+            if 'eta' in stats_dict:
+                self.eta_label.setText(self._format_time(stats_dict['eta']) if stats_dict['eta'] > 0 else "לא ידוע")
+            if 'last_sync' in stats_dict:
+                self.last_sync_label.setText(stats_dict['last_sync'])
+                
+        except Exception as e:
+            print(f"שגיאה בעדכון סטטיסטיקות: {e}")
+    
+    def _format_time(self, seconds):
+        """פורמט זמן בשניות לפורמט HH:MM:SS"""
+        try:
+            if seconds < 0:
+                return "לא ידוע"
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        except:
+            return "00:00:00"
+    
+    def export_stats(self):
+        """ייצוא סטטיסטיקות לקובץ"""
+        try:
+            from datetime import datetime
+            
+            stats_data = {
+                "timestamp": datetime.now().isoformat(),
+                "books_count": self.books_count_label.text(),
+                "files_size": self.files_size_label.text(),
+                "download_speed": self.download_speed_label.text(),
+                "avg_speed": self.avg_speed_label.text(),
+                "memory_usage": self.memory_usage_label.text(),
+                "active_threads": self.active_threads_label.text(),
+                "errors_count": self.errors_count_label.text(),
+                "elapsed_time": self.elapsed_time_label.text(),
+                "eta": self.eta_label.text(),
+                "last_sync": self.last_sync_label.text()
+            }
+            
+            filename = f"otzaria_sync_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            import json
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(stats_data, f, indent=2, ensure_ascii=False)
+            
+            return filename
+            
+        except Exception as e:
+            print(f"שגיאה בייצוא סטטיסטיקות: {e}")
+            return None
+    
+    def update_stats(self, books=None, size_mb=None, last_sync=None, speed=None):
+        """מתודה לתאימות לאחור עם הקוד הישן"""
+        try:
+            stats_dict = {}
+            if books is not None:
+                stats_dict['books_count'] = books
+            if size_mb is not None:
+                stats_dict['total_size_mb'] = size_mb
+            if last_sync is not None:
+                stats_dict['last_sync'] = last_sync
+            if speed is not None:
+                stats_dict['download_speed'] = speed
+            
+            # קריאה למתודה החדשה
+            self.update_real_time_stats(stats_dict)
+            
+        except Exception as e:
+            print(f"שגיאה בעדכון סטטיסטיקות (תאימות לאחור): {e}")
+
+
+
+class ShortcutManager:
+    """מנהל קיצורי מקלדת"""
+    
+    def __init__(self, main_window):
+        self.main_window = main_window
+        self.shortcuts = {}
+        self.descriptions = {}
+        
+    def setup_shortcuts(self):
+        """הגדרת כל קיצורי המקלדת"""
+        try:
+            # קיצורי פעולות בסיסיות
+            self.add_shortcut("Ctrl+S", self._start_sync, "התחלת תהליך סנכרון")
+            self.add_shortcut("Ctrl+P", self._toggle_pause, "השהיה/המשכה של התהליך")
+            self.add_shortcut("Ctrl+Q", self._quit_application, "יציאה מהאפליקציה")
+            self.add_shortcut("Ctrl+O", self._open_folder_dialog, "פתיחת דיאלוג בחירת תיקיה")
+            
+            # קיצורי ערכת נושא וגופן
+            self.add_shortcut("Ctrl+D", self._toggle_theme, "החלפה בין מצב כהה לבהיר")
+            self.add_shortcut("Ctrl++", self._increase_font, "הגדלת גודל גופן")
+            self.add_shortcut("Ctrl+-", self._decrease_font, "הקטנת גודל גופן")
+            self.add_shortcut("Ctrl+0", self._reset_font, "איפוס גודל גופן לברירת מחדל")
+            
+            # קיצורי עזרה ומידע
+            self.add_shortcut("F1", self._show_help, "הצגת עזרה וקיצורי מקלדת")
+            self.add_shortcut("Ctrl+I", self._show_info, "הצגת מידע על האפליקציה")
+            
+            # קיצורי ניווט
+            self.add_shortcut("Ctrl+1", lambda: self._switch_tab(0), "מעבר לטאב סנכרון")
+            self.add_shortcut("Ctrl+2", lambda: self._switch_tab(1), "מעבר לטאב הגדרות")
+            self.add_shortcut("Ctrl+3", lambda: self._switch_tab(2), "מעבר לטאב סטטיסטיקות")
+            
+            # קיצורי פעולות מתקדמות
+            self.add_shortcut("Ctrl+R", self._reset_data, "איפוס מצב התקדמות")
+            self.add_shortcut("Ctrl+E", self._export_stats, "ייצוא סטטיסטיקות")
+            self.add_shortcut("Escape", self._cancel_operation, "ביטול פעולה נוכחית")
+            
+            return True
+            
+        except Exception as e:
+            print(f"שגיאה בהגדרת קיצורי מקלדת: {e}")
+            return False
+    
+    def add_shortcut(self, key_sequence, callback, description):
+        """הוספת קיצור מקלדת"""
+        try:
+            # בדיקת התנגשות עם קיצורים קיימים
+            if key_sequence in self.shortcuts:
+                print(f"אזהרה: קיצור {key_sequence} כבר קיים")
+                return False
+            
+            # יצירת QShortcut
+            shortcut = QShortcut(QKeySequence(key_sequence), self.main_window)
+            shortcut.activated.connect(callback)
+            
+            # שמירה במאגר
+            self.shortcuts[key_sequence] = shortcut
+            self.descriptions[key_sequence] = description
+            
+            return True
+            
+        except Exception as e:
+            print(f"שגיאה בהוספת קיצור {key_sequence}: {e}")
+            return False
+    
+    def remove_shortcut(self, key_sequence):
+        """הסרת קיצור מקלדת"""
+        try:
+            if key_sequence in self.shortcuts:
+                self.shortcuts[key_sequence].deleteLater()
+                del self.shortcuts[key_sequence]
+                del self.descriptions[key_sequence]
+                return True
+            return False
+        except Exception as e:
+            print(f"שגיאה בהסרת קיצור {key_sequence}: {e}")
+            return False
+    
+    def _start_sync(self):
+        """התחלת תהליך סנכרון"""
+        try:
+            if hasattr(self.main_window, 'btn_load_manifests') and self.main_window.btn_load_manifests.isEnabled():
+                self.main_window.load_manifests()
+            elif hasattr(self.main_window, 'btn_download_updates') and self.main_window.btn_download_updates.isEnabled():
+                self.main_window.download_updates()
+            elif hasattr(self.main_window, 'btn_apply_updates') and self.main_window.btn_apply_updates.isEnabled():
+                self.main_window.apply_updates()
+        except Exception as e:
+            print(f"שגיאה בהתחלת סנכרון: {e}")
+    
+    def _toggle_pause(self):
+        """השהיה/המשכה של התהליך"""
+        try:
+            if hasattr(self.main_window, 'btn_pause') and self.main_window.btn_pause.isEnabled():
+                self.main_window.toggle_pause()
+        except Exception as e:
+            print(f"שגיאה בהשהיה/המשכה: {e}")
+    
+    def _quit_application(self):
+        """יציאה מהאפליקציה"""
+        try:
+            self.main_window.close()
+        except Exception as e:
+            print(f"שגיאה ביציאה מהאפליקציה: {e}")
+    
+    def _open_folder_dialog(self):
+        """פתיחת דיאלוג בחירת תיקיה"""
+        try:
+            if hasattr(self.main_window, 'select_folder_manually'):
+                self.main_window.select_folder_manually()
+        except Exception as e:
+            print(f"שגיאה בפתיחת דיאלוג תיקיה: {e}")
+    
+    def _toggle_theme(self):
+        """החלפה בין ערכות נושא"""
+        try:
+            if hasattr(self.main_window, 'theme_manager'):
+                self.main_window.theme_manager.toggle_theme(self.main_window)
+        except Exception as e:
+            print(f"שגיאה בהחלפת ערכת נושא: {e}")
+    
+    def _increase_font(self):
+        """הגדלת גודל גופן"""
+        try:
+            if hasattr(self.main_window, 'font_manager'):
+                success = self.main_window.font_manager.increase_font_size(self.main_window)
+                if success:
+                    self.main_window.status_bar.showMessage(f"גודל גופן: {self.main_window.font_manager.current_font_size}", 2000)
+        except Exception as e:
+            print(f"שגיאה בהגדלת גופן: {e}")
+    
+    def _decrease_font(self):
+        """הקטנת גודל גופן"""
+        try:
+            if hasattr(self.main_window, 'font_manager'):
+                success = self.main_window.font_manager.decrease_font_size(self.main_window)
+                if success:
+                    self.main_window.status_bar.showMessage(f"גודל גופן: {self.main_window.font_manager.current_font_size}", 2000)
+        except Exception as e:
+            print(f"שגיאה בהקטנת גופן: {e}")
+    
+    def _reset_font(self):
+        """איפוס גודל גופן"""
+        try:
+            if hasattr(self.main_window, 'font_manager'):
+                success = self.main_window.font_manager.reset_to_default(self.main_window)
+                if success:
+                    self.main_window.status_bar.showMessage("גודל גופן אופס לברירת מחדל", 2000)
+        except Exception as e:
+            print(f"שגיאה באיפוס גופן: {e}")
+    
+    def _switch_tab(self, tab_index):
+        """מעבר לטאב ספציפי"""
+        try:
+            if hasattr(self.main_window, 'tab_widget'):
+                if 0 <= tab_index < self.main_window.tab_widget.count():
+                    self.main_window.tab_widget.setCurrentIndex(tab_index)
+        except Exception as e:
+            print(f"שגיאה במעבר לטאב: {e}")
+    
+    def _reset_data(self):
+        """איפוס מצב התקדמות"""
+        try:
+            if hasattr(self.main_window, 'reset_data'):
+                self.main_window.reset_data()
+        except Exception as e:
+            print(f"שגיאה באיפוס נתונים: {e}")
+    
+    def _export_stats(self):
+        """ייצוא סטטיסטיקות"""
+        try:
+            if hasattr(self.main_window, 'stats_widget'):
+                filename = self.main_window.stats_widget.export_stats()
+                if filename:
+                    self.main_window.status_bar.showMessage(f"סטטיסטיקות יוצאו ל: {filename}", 3000)
+        except Exception as e:
+            print(f"שגיאה בייצוא סטטיסטיקות: {e}")
+    
+    def _cancel_operation(self):
+        """ביטול פעולה נוכחית"""
+        try:
+            if hasattr(self.main_window, 'btn_cancel') and self.main_window.btn_cancel.isEnabled():
+                self.main_window.cancel_operation()
+        except Exception as e:
+            print(f"שגיאה בביטול פעולה: {e}")
+    
+    def _show_help(self):
+        """הצגת דיאלוג עזרה"""
+        self.show_help_dialog()
+    
+    def _show_info(self):
+        """הצגת מידע על האפליקציה"""
+        try:
+            QMessageBox.information(
+                self.main_window,
+                "אודות אוצריא סינק",
+                "אוצריא סינק - גרסה 2.0\n\n"
+                "תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט\n"
+                "פותח על ידי צוות אוצריא\n\n"
+                "לחץ F1 לקבלת עזרה וקיצורי מקלדת"
+            )
+        except Exception as e:
+            print(f"שגיאה בהצגת מידע: {e}")
+    
+    def show_help_dialog(self):
+        """הצגת דיאלוג עזרה עם קיצורי מקלדת"""
+        try:
+            help_text = "קיצורי מקלדת זמינים:\n\n"
+            
+            # קיבוץ קיצורים לפי קטגוריות
+            categories = {
+                "פעולות בסיסיות": ["Ctrl+S", "Ctrl+P", "Ctrl+Q", "Ctrl+O", "Escape"],
+                "ערכת נושא וגופן": ["Ctrl+D", "Ctrl++", "Ctrl+-", "Ctrl+0"],
+                "ניווט": ["Ctrl+1", "Ctrl+2", "Ctrl+3"],
+                "פעולות מתקדמות": ["Ctrl+R", "Ctrl+E"],
+                "עזרה": ["F1", "Ctrl+I"]
+            }
+            
+            for category, shortcuts in categories.items():
+                help_text += f"{category}:\n"
+                for shortcut in shortcuts:
+                    if shortcut in self.descriptions:
+                        help_text += f"  {shortcut} - {self.descriptions[shortcut]}\n"
+                help_text += "\n"
+            
+            # יצירת דיאלוג עזרה
+            help_dialog = QMessageBox(self.main_window)
+            help_dialog.setWindowTitle("עזרה - קיצורי מקלדת")
+            help_dialog.setText(help_text)
+            help_dialog.setIcon(QMessageBox.Icon.Information)
+            help_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            
+            # הגדרת גודל החלון
+            help_dialog.setMinimumWidth(500)
+            help_dialog.setMinimumHeight(400)
+            
+            help_dialog.exec()
+            
+        except Exception as e:
+            print(f"שגיאה בהצגת עזרה: {e}")
+    
+    def get_shortcuts_list(self):
+        """קבלת רשימת כל הקיצורים"""
+        return list(self.shortcuts.keys())
+    
+    def get_shortcut_description(self, key_sequence):
+        """קבלת תיאור קיצור"""
+        return self.descriptions.get(key_sequence, "")
+    
+    def is_shortcut_available(self, key_sequence):
+        """בדיקה האם קיצור זמין"""
+        return key_sequence not in self.shortcuts
+
 class OtzariaSync(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -910,111 +2823,235 @@ class OtzariaSync(QMainWindow):
         self.is_paused = False
         self.is_cancelled = False
         self.state_manager = StateManager()
+        
+        # הגדרות אפליקציה
+        self.settings = QSettings("OtzariaSync", "Settings")
+        
+        # אתחול כל המנהלים
+        try:
+            self.animation_manager = AnimationManager()
+            self.icon_manager = IconManager()
+            self.theme_manager = ThemeManager(self.settings)
+            self.font_manager = FontManager(self.settings)
+            self.shortcut_manager = ShortcutManager(self)
+            
+            print("כל המנהלים אותחלו בהצלחה")
+        except Exception as e:
+            print(f"שגיאה באתחול מנהלים: {e}")
+            # fallback למנהלים בסיסיים
+            self.animation_manager = None
+            self.icon_manager = IconManager()
+            self.theme_manager = None
+            self.font_manager = None
+            self.shortcut_manager = None
+        
+        # סטטיסטיקות
+        self.total_books = 0
+        self.total_size_mb = 0
+        self.current_speed = 0
+        
+        # מעקב טאבים לאנימציות
+        self._previous_tab_index = 0
+        
+        # אתחול UI
         self.initUI()
+        
+        # הגדרת קיצורי מקלדת
+        if self.shortcut_manager:
+            self.shortcut_manager.setup_shortcuts()
+        
+        # החלת ערכת נושא וגופן
+        self.apply_initial_settings()
         
     def initUI(self):
         self.setWindowTitle("אוצריא - סנכרון אופליין")
-        self.setGeometry(100, 100, 600, 550)  # הקטנת הגובה מ-500 ל-400
-        # self.setMinimumSize(500, 300)  # גודל מינימלי נמוך יותר
+        
+        # התאמת גודל חלון למסך
+        screen = QApplication.primaryScreen().availableGeometry()
+        window_width = min(800, int(screen.width() * 0.8))
+        window_height = min(700, int(screen.height() * 0.8))
+        
+        self.setGeometry(100, 100, window_width, window_height)
+        self.setMinimumSize(600, 400)  # הקטנת מינימום
+        self.setMaximumSize(screen.width(), screen.height())
+        
+        # הפעלת כפתור הרחבה למסך מלא
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
+        
         self.setWindowIcon(self.load_icon_from_base64(icon_base64))
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         
-        # Widget מרכזי
+        # הסרת תפריט עליון (לפי בקשת המשתמש)
+        # self.create_menu_bar()  # מוסתר - קיצורי מקלדת עדיין פעילים
+        
+        # יצירת status bar
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        self.status_bar.showMessage("מוכן לפעולה")
+        
+        # Widget מרכזי עם גלילה
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(central_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setCentralWidget(scroll_area)
         
         # Layout ראשי
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(10)  # הקטנה מ-20 ל-10
-        main_layout.setContentsMargins(15, 15, 15, 15)  # הקטנה מ-20 ל-15
+        main_layout.setSpacing(10)  # הקטנת spacing
+        main_layout.setContentsMargins(15, 15, 15, 15)  # הקטנת margins
         
-        # כותרת
+        # יצירת טאבים
+        self.tab_widget = QTabWidget()
+        
+        # חיבור אנימציות טאבים
+        if self.animation_manager:
+            self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        
+        # טאב ראשי - סנכרון
+        sync_tab = QWidget()
+        sync_layout = QVBoxLayout()
+        
+        # טאב הגדרות
+        settings_tab = QWidget()
+        settings_layout = QVBoxLayout()
+        
+        # טאב סטטיסטיקות
+        stats_tab = QWidget()
+        stats_layout = QVBoxLayout()
+        
+        # === טאב סנכרון ===
+        # כותרת עם אנימציה
         title_label = QLabel("אוצריא - סנכרון אופליין")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_font = QFont()
-        title_font.setPointSize(18)
+        title_font.setPointSize(20)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #2E4057; margin-bottom: 10px;")
+        title_label.setStyleSheet("color: #2E4057; margin-bottom: 15px; padding: 10px;")
         
         # תת-כותרת
         subtitle_label = QLabel("תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle_label.setStyleSheet("color: #5A6C7D; margin-bottom: 17px;")
+        subtitle_label.setStyleSheet("color: #5A6C7D; margin-bottom: 20px; font-size: 14px;")
         
         # מסגרת לכפתורים
         buttons_frame = QFrame()
         buttons_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         buttons_frame.setStyleSheet("QFrame { background-color: #F8F9FA; border-radius: 10px; }")
         buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(10)  # הקטנה מ-15 ל-10
-        buttons_layout.setContentsMargins(15, 15, 15, 15)  # הקטנה מ-20 ל-15
+        buttons_layout.setSpacing(8)  # הקטנה נוספת
+        buttons_layout.setContentsMargins(12, 12, 12, 12)  # הקטנה נוספת
         
-        # כפתור 1
-        self.btn_load_manifests = QPushButton("טען קבצי נתוני ספרים")
-        self.btn_load_manifests.setMinimumHeight(50)
-        self.btn_load_manifests.setStyleSheet("""
+        # כפתורים משופרים עם אייקונים
+        self.btn_load_manifests = AnimatedButton("טען קבצי נתוני ספרים")
+        self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24))
+        self.btn_load_manifests.setIconSize(QSize(24, 24))
+        self.btn_load_manifests.setToolTip("מחפש את תיקיית אוצריא במחשב, וטוען את קבצי המניפסט מתיקיית התוכנה\nקיצור מקלדת: Ctrl+S")
+        self.btn_load_manifests.setMinimumHeight(50)  # הקטנה מ-60 ל-50
+        self.btn_load_manifests.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        original_style = """
             QPushButton {
-                background-color: #4CAF50;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4CAF50, stop:1 #45a049);
                 color: white;
                 border: none;
-                border-radius: 8px;
-                font-size: 14px;
+                border-radius: 12px;
+                font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
+                padding: 10px;
             }
             QPushButton:disabled {
                 background-color: #CCCCCC;
                 color: #666666;
             }
-        """)
+        """
+        hover_style = """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5CBF60, stop:1 #4CAF50);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 10px;
+            }
+        """
+        self.btn_load_manifests.set_styles(original_style, hover_style)
         self.btn_load_manifests.clicked.connect(self.load_manifests)
         
         # כפתור 2
-        self.btn_download_updates = QPushButton("הורד קבצים חדשים וקבצים שהתעדכנו")
-        self.btn_download_updates.setMinimumHeight(50)
-        self.btn_download_updates.setStyleSheet("""
+        self.btn_download_updates = AnimatedButton("הורד קבצים חדשים וקבצים שהתעדכנו")
+        self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24))
+        self.btn_download_updates.setIconSize(QSize(24, 24))
+        self.btn_download_updates.setToolTip("מוריד קבצים חדשים ומעודכנים מהשרת\nזמין רק לאחר טעינת קבצי הנתונים")
+        self.btn_download_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
+        self.btn_download_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        original_style2 = """
             QPushButton {
-                background-color: #2196F3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2);
                 color: white;
                 border: none;
-                border-radius: 8px;
-                font-size: 14px;
+                border-radius: 12px;
+                font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
+                padding: 10px;
             }
             QPushButton:disabled {
                 background-color: #CCCCCC;
                 color: #666666;
             }
-        """)
+        """
+        hover_style2 = """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 10px;
+            }
+        """
+        self.btn_download_updates.set_styles(original_style2, hover_style2)
         self.btn_download_updates.clicked.connect(self.download_updates)
         self.btn_download_updates.setEnabled(False)
         
         # כפתור 3
-        self.btn_apply_updates = QPushButton("עדכן שינויים לתוך מאגר הספרים")
-        self.btn_apply_updates.setMinimumHeight(50)
-        self.btn_apply_updates.setStyleSheet("""
+        self.btn_apply_updates = AnimatedButton("עדכן שינויים לתוך מאגר הספרים")
+        self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24))
+        self.btn_apply_updates.setIconSize(QSize(24, 24))
+        self.btn_apply_updates.setToolTip("מעתיק את הקבצים החדשים לתיקיית אוצריא\nזמין רק לאחר הורדת העדכונים")
+        self.btn_apply_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
+        self.btn_apply_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        original_style3 = """
             QPushButton {
-                background-color: #FF9800;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00);
                 color: white;
                 border: none;
-                border-radius: 8px;
-                font-size: 14px;
+                border-radius: 12px;
+                font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;
+                padding: 10px;
             }
             QPushButton:disabled {
                 background-color: #CCCCCC;
                 color: #666666;
             }
-        """)
+        """
+        hover_style3 = """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800);
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 10px;
+            }
+        """
+        self.btn_apply_updates.set_styles(original_style3, hover_style3)
         self.btn_apply_updates.clicked.connect(self.apply_updates)
         self.btn_apply_updates.setEnabled(False)
         
@@ -1022,6 +3059,9 @@ class OtzariaSync(QMainWindow):
         control_layout = QHBoxLayout()
         
         self.btn_pause = QPushButton("השהה")
+        self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
+        self.btn_pause.setIconSize(QSize(16, 16))
+        self.btn_pause.setToolTip("השהה או המשך את התהליך הנוכחי\nקיצור מקלדת: Ctrl+P")
         self.btn_pause.setMinimumHeight(40)
         self.btn_pause.setStyleSheet("""
             QPushButton {
@@ -1039,6 +3079,9 @@ class OtzariaSync(QMainWindow):
         self.btn_pause.setEnabled(False)
         
         self.btn_cancel = QPushButton("בטל")
+        self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16))
+        self.btn_cancel.setIconSize(QSize(16, 16))
+        self.btn_cancel.setToolTip("בטל את התהליך הנוכחי\nקיצור מקלדת: Escape")
         self.btn_cancel.setMinimumHeight(40)
         self.btn_cancel.setStyleSheet("""
             QPushButton {
@@ -1056,6 +3099,9 @@ class OtzariaSync(QMainWindow):
         self.btn_cancel.setEnabled(False)
 
         self.btn_reset_data = QPushButton("איפוס מצב")
+        self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16))
+        self.btn_reset_data.setIconSize(QSize(16, 16))
+        self.btn_reset_data.setToolTip("מאפס את מצב ההתקדמות ומתחיל מחדש\nקיצור מקלדת: Ctrl+R")
         self.btn_reset_data.setMinimumHeight(40)
         self.btn_reset_data.setStyleSheet("""
             QPushButton {
@@ -1071,18 +3117,24 @@ class OtzariaSync(QMainWindow):
         """)
         self.btn_reset_data.clicked.connect(self.reset_data)
 
-        # Progress bar
-        self.progress_bar = QProgressBar()
+        # Progress bar משופר
+        self.progress_bar = EnhancedProgressBar()
         self.progress_bar.setVisible(False)
+        self.progress_bar.setMinimumHeight(30)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                border: 2px solid #CCCCCC;
-                border-radius: 5px;
+                border: 2px solid #E0E0E0;
+                border-radius: 15px;
                 text-align: center;
+                font-weight: bold;
+                font-size: 12px;
+                background-color: #F5F5F5;
             }
             QProgressBar::chunk {
-                background-color: #4CAF50;
-                border-radius: 3px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #4CAF50, stop:0.5 #66BB6A, stop:1 #4CAF50);
+                border-radius: 13px;
+                margin: 2px;
             }
         """)
         
@@ -1118,28 +3170,74 @@ class OtzariaSync(QMainWindow):
             }
         """)
 
-        # הוספת כל הרכיבים ללייאוט
-        main_layout.addWidget(title_label)
-        main_layout.addWidget(subtitle_label)
+        # הוספת רכיבים לטאב סנכרון
+        sync_layout.addWidget(title_label)
+        sync_layout.addWidget(subtitle_label)
+        sync_layout.addWidget(self.status_label)
         
-        main_layout.addWidget(self.status_label)
         buttons_layout.addWidget(self.btn_load_manifests)
         buttons_layout.addWidget(self.btn_download_updates)
         buttons_layout.addWidget(self.btn_apply_updates)
         buttons_frame.setLayout(buttons_layout)
-        main_layout.addWidget(buttons_frame)
-        main_layout.addWidget(self.step_label)
-        main_layout.addWidget(self.progress_bar)
+        sync_layout.addWidget(buttons_frame)
+        
+        sync_layout.addWidget(self.step_label)
+        sync_layout.addWidget(self.progress_bar)
+        
         control_layout.addWidget(self.btn_pause)
         control_layout.addWidget(self.btn_cancel)
+        control_layout.addWidget(self.btn_reset_data)
         buttons_layout.addLayout(control_layout)
-        control_layout.addWidget(self.btn_reset_data)      
-        # תווית יומן פעולות עם מרווח קטן
-        log_label = QLabel("יומן פעולות:")
-        log_label.setStyleSheet("margin-bottom: 2px; margin-top: 5px; font-weight: bold;")
-        main_layout.addWidget(log_label)
-        main_layout.addWidget(self.log_text)
         
+        # יומן פעולות
+        log_label = QLabel("יומן פעולות:")
+        log_label.setStyleSheet("margin-bottom: 5px; margin-top: 10px; font-weight: bold; font-size: 14px;")
+        sync_layout.addWidget(log_label)
+        sync_layout.addWidget(self.log_text)
+        
+        sync_tab.setLayout(sync_layout)
+        
+        # === טאב הגדרות ===
+        self.setup_enhanced_settings_tab(settings_layout)
+        settings_tab.setLayout(settings_layout)
+        
+        # === טאב סטטיסטיקות ===
+        self.stats_widget = AdvancedStatsWidget()
+        stats_layout.addWidget(self.stats_widget)
+        
+        # גרף התקדמות (placeholder)
+        progress_group = QGroupBox("התקדמות כללית")
+        progress_layout = QVBoxLayout()
+        
+        self.overall_progress = QProgressBar()
+        self.overall_progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #E0E0E0;
+                border-radius: 10px;
+                text-align: center;
+                font-weight: bold;
+                background-color: #F5F5F5;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #2196F3, stop:1 #42A5F5);
+                border-radius: 8px;
+                margin: 2px;
+            }
+        """)
+        progress_layout.addWidget(self.overall_progress)
+        progress_group.setLayout(progress_layout)
+        stats_layout.addWidget(progress_group)
+        
+        stats_layout.addStretch()
+        stats_tab.setLayout(stats_layout)
+        
+        # הוספת טאבים
+        self.tab_widget.addTab(sync_tab, "🔄 סנכרון")
+        self.tab_widget.addTab(settings_tab, "⚙️ הגדרות")
+        self.tab_widget.addTab(stats_tab, "📊 סטטיסטיקות")
+        
+        main_layout.addWidget(self.tab_widget)
         central_widget.setLayout(main_layout)
         
         # סגנון כללי
@@ -1155,6 +3253,607 @@ class OtzariaSync(QMainWindow):
         self.load_and_set_state()
         self.check_pyinstaller_compatibility()
         self.log("התוכנה מוכנה לפעולה")
+        
+    def create_menu_bar(self):
+        """יצירת מנו עליון"""
+        menubar = self.menuBar()
+        
+        # מנו קובץ
+        file_menu = menubar.addMenu('קובץ')
+        
+        # פעולות
+        reset_action = QAction('איפוס מצב', self)
+        reset_action.setShortcut('Ctrl+R')
+        reset_action.triggered.connect(self.reset_state)
+        file_menu.addAction(reset_action)
+        
+        file_menu.addSeparator()
+        
+        exit_action = QAction('יציאה', self)
+        exit_action.setShortcut('Ctrl+Q')
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # מנו תצוגה
+        view_menu = menubar.addMenu('תצוגה')
+        
+        theme_action = QAction('החלף ערכת צבעים', self)
+        theme_action.setShortcut('Ctrl+T')
+        theme_action.triggered.connect(self.toggle_theme)
+        view_menu.addAction(theme_action)
+        
+        font_increase = QAction('הגדל גופן', self)
+        font_increase.setShortcut('Ctrl++')
+        font_increase.triggered.connect(self.increase_font)
+        view_menu.addAction(font_increase)
+        
+        font_decrease = QAction('הקטן גופן', self)
+        font_decrease.setShortcut('Ctrl+-')
+        font_decrease.triggered.connect(self.decrease_font)
+        view_menu.addAction(font_decrease)
+        
+    def setup_settings_tab(self, layout):
+        """הגדרת טאב ההגדרות"""
+        # קבוצת ערכת צבעים
+        theme_group = QGroupBox("ערכת צבעים")
+        theme_layout = QVBoxLayout()
+        
+        self.dark_mode_checkbox = QCheckBox("מצב כהה")
+        current_dark_mode = self.theme_manager.current_theme == "dark" if self.theme_manager else self.settings.value("dark_mode", False, type=bool)
+        self.dark_mode_checkbox.setChecked(current_dark_mode)
+        self.dark_mode_checkbox.toggled.connect(self.toggle_theme)
+        theme_layout.addWidget(self.dark_mode_checkbox)
+        
+        theme_group.setLayout(theme_layout)
+        layout.addWidget(theme_group)
+        
+        # קבוצת גופן
+        font_group = QGroupBox("הגדרות גופן")
+        font_layout = QVBoxLayout()
+        
+        font_size_layout = QHBoxLayout()
+        font_size_layout.addWidget(QLabel("גודל גופן:"))
+        
+        self.font_slider = QSlider(Qt.Orientation.Horizontal)
+        self.font_slider.setMinimum(8)
+        self.font_slider.setMaximum(20)
+        current_font_size = self.font_manager.current_font_size if self.font_manager else self.settings.value("font_size", 10, type=int)
+        self.font_slider.setValue(current_font_size)
+        self.font_slider.valueChanged.connect(self.change_font_size)
+        
+        self.font_size_label = QLabel(str(current_font_size))
+        
+        font_size_layout.addWidget(self.font_slider)
+        font_size_layout.addWidget(self.font_size_label)
+        
+        font_layout.addLayout(font_size_layout)
+        font_group.setLayout(font_layout)
+        layout.addWidget(font_group)
+        
+        # קבוצת קיצורי מקלדת
+        shortcuts_group = QGroupBox("קיצורי מקלדת")
+        shortcuts_layout = QVBoxLayout()
+        
+        shortcuts_text = """
+        Alt+1 - שלב ראשון (טעינת קבצי נתונים)
+        Alt+2 - שלב שני (הורדת עדכונים)
+        Alt+3 - שלב שלישי (החלת עדכונים)
+        Ctrl+T - החלף ערכת צבעים
+        Ctrl+R - איפוס מצב
+        Ctrl++ - הגדל גופן
+        Ctrl+- - הקטן גופן
+        Space - השהה/המשך
+        Escape - בטל פעולה
+        """
+        
+        shortcuts_label = QLabel(shortcuts_text)
+        shortcuts_label.setStyleSheet("font-family: monospace; background-color: #F5F5F5; padding: 10px; border-radius: 5px;")
+        shortcuts_layout.addWidget(shortcuts_label)
+        
+        shortcuts_group.setLayout(shortcuts_layout)
+        layout.addWidget(shortcuts_group)
+        
+        layout.addStretch()
+        
+    def setup_enhanced_settings_tab(self, layout):
+        """הגדרת טאב הגדרות משופר"""
+        
+        # יצירת scroll area לטאב הגדרות
+        scroll_area = QScrollArea()
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout()
+        
+        # === קבוצת ערכת נושא ===
+        theme_group = QGroupBox("🎨 ערכת נושא")
+        theme_layout = QVBoxLayout()
+        
+        # כפתורי בחירת ערכת נושא
+        theme_buttons_layout = QHBoxLayout()
+        
+        self.light_theme_btn = QPushButton("☀️ בהיר")
+        self.light_theme_btn.setCheckable(True)
+        self.light_theme_btn.clicked.connect(lambda: self.set_theme_mode("light"))
+        
+        self.dark_theme_btn = QPushButton("🌙 כהה")
+        self.dark_theme_btn.setCheckable(True)
+        self.dark_theme_btn.clicked.connect(lambda: self.set_theme_mode("dark"))
+        
+        # הגדרת מצב נוכחי
+        current_theme = self.theme_manager.current_theme if self.theme_manager else ("dark" if self.settings.value("dark_mode", False, type=bool) else "light")
+        if current_theme == "light":
+            self.light_theme_btn.setChecked(True)
+        else:
+            self.dark_theme_btn.setChecked(True)
+        
+        theme_buttons_layout.addWidget(self.light_theme_btn)
+        theme_buttons_layout.addWidget(self.dark_theme_btn)
+        theme_layout.addLayout(theme_buttons_layout)
+        
+        theme_group.setLayout(theme_layout)
+        scroll_layout.addWidget(theme_group)
+        
+        # === קבוצת גופן ===
+        font_group = QGroupBox("🔤 הגדרות גופן")
+        font_layout = QVBoxLayout()
+        
+        # גודל גופן עם slider ו-spinbox
+        font_size_layout = QHBoxLayout()
+        font_size_layout.addWidget(QLabel("גודל גופן:"))
+        
+        current_font_size = self.font_manager.current_font_size if self.font_manager else self.settings.value("font_size", 10, type=int)
+        
+        self.font_slider_new = QSlider(Qt.Orientation.Horizontal)
+        self.font_slider_new.setMinimum(8)
+        self.font_slider_new.setMaximum(20)
+        self.font_slider_new.setValue(current_font_size)
+        self.font_slider_new.valueChanged.connect(self.on_font_slider_changed)
+        
+        from PyQt6.QtWidgets import QSpinBox
+        self.font_spinbox = QSpinBox()
+        self.font_spinbox.setMinimum(8)
+        self.font_spinbox.setMaximum(20)
+        self.font_spinbox.setValue(current_font_size)
+        self.font_spinbox.valueChanged.connect(self.on_font_spinbox_changed)
+        
+        font_size_layout.addWidget(self.font_slider_new)
+        font_size_layout.addWidget(self.font_spinbox)
+        font_layout.addLayout(font_size_layout)
+        
+        # כפתורי גופן מהירים
+        font_buttons_layout = QHBoxLayout()
+        
+        font_decrease_btn = QPushButton("➖ הקטן")
+        font_decrease_btn.clicked.connect(self.decrease_font_size)
+        
+        font_reset_btn = QPushButton("🔄 איפוס")
+        font_reset_btn.clicked.connect(self.reset_font_size)
+        
+        font_increase_btn = QPushButton("➕ הגדל")
+        font_increase_btn.clicked.connect(self.increase_font_size)
+        
+        font_buttons_layout.addWidget(font_decrease_btn)
+        font_buttons_layout.addWidget(font_reset_btn)
+        font_buttons_layout.addWidget(font_increase_btn)
+        font_layout.addLayout(font_buttons_layout)
+        
+        # תצוגה מקדימה של גופן
+        self.font_preview = QLabel("דוגמה לטקסט בגופן הנוכחי - אוצריא סינק")
+        self.font_preview.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;")
+        font_layout.addWidget(self.font_preview)
+        
+        font_group.setLayout(font_layout)
+        scroll_layout.addWidget(font_group)
+        
+        # === כפתורי פעולה ===
+        actions_layout = QHBoxLayout()
+        
+        reset_all_btn = QPushButton("🔄 איפוס כל ההגדרות")
+        reset_all_btn.clicked.connect(self.reset_all_settings)
+        reset_all_btn.setStyleSheet("background-color: #f44336; color: white; padding: 8px; border-radius: 5px;")
+        
+        show_shortcuts_btn = QPushButton("⌨️ קיצורי מקלדת")
+        show_shortcuts_btn.clicked.connect(self.show_keyboard_shortcuts_help)
+        
+        actions_layout.addWidget(reset_all_btn)
+        actions_layout.addWidget(show_shortcuts_btn)
+        
+        scroll_layout.addLayout(actions_layout)
+        scroll_layout.addStretch()
+        
+        # הגדרת scroll area
+        scroll_widget.setLayout(scroll_layout)
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        
+        # הוספה ל-layout הראשי
+        layout.addWidget(scroll_area)
+    
+    # פונקציות טיפול בהגדרות משופרות
+    def set_theme_mode(self, theme_name):
+        """הגדרת מצב ערכת נושא"""
+        try:
+            if self.theme_manager:
+                success = self.theme_manager.apply_theme(theme_name, self)
+                if success:
+                    # עדכון כפתורים
+                    self.light_theme_btn.setChecked(theme_name == "light")
+                    self.dark_theme_btn.setChecked(theme_name == "dark")
+                    
+                    theme_display = "בהיר" if theme_name == "light" else "כהה"
+                    self.status_bar.showMessage(f"עבר למצב {theme_display}", 2000)
+        except Exception as e:
+            print(f"שגיאה בהגדרת ערכת נושא: {e}")
+    
+    def on_font_slider_changed(self, value):
+        """טיפול בשינוי slider הגופן"""
+        try:
+            if hasattr(self, 'font_spinbox'):
+                self.font_spinbox.setValue(value)
+            
+            if self.font_manager:
+                self.font_manager.set_font_size(value, self)
+            
+            # עדכון תצוגה מקדימה
+            if hasattr(self, 'font_preview'):
+                font = self.font_preview.font()
+                font.setPointSize(value)
+                self.font_preview.setFont(font)
+                
+        except Exception as e:
+            print(f"שגיאה בשינוי גופן: {e}")
+    
+    def on_font_spinbox_changed(self, value):
+        """טיפול בשינוי spinbox הגופן"""
+        try:
+            if hasattr(self, 'font_slider_new'):
+                self.font_slider_new.setValue(value)
+            
+            if self.font_manager:
+                self.font_manager.set_font_size(value, self)
+                
+        except Exception as e:
+            print(f"שגיאה בשינוי גופן: {e}")
+    
+    def reset_font_size(self):
+        """איפוס גודל גופן לברירת מחדל"""
+        try:
+            if self.font_manager:
+                success = self.font_manager.reset_to_default(self)
+                if success:
+                    # עדכון בקרות
+                    if hasattr(self, 'font_slider_new'):
+                        self.font_slider_new.setValue(self.font_manager.base_font_size)
+                    if hasattr(self, 'font_spinbox'):
+                        self.font_spinbox.setValue(self.font_manager.base_font_size)
+                    
+                    self.status_bar.showMessage("גודל גופן אופס לברירת מחדל", 2000)
+        except Exception as e:
+            print(f"שגיאה באיפוס גופן: {e}")
+    
+    def reset_all_settings(self):
+        """איפוס כל ההגדרות לברירת מחדל"""
+        try:
+            reply = QMessageBox.question(
+                self,
+                "איפוס הגדרות",
+                "האם אתה בטוח שברצונך לאפס את כל ההגדרות לברירת מחדל?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                # איפוס הגדרות
+                self.settings.clear()
+                
+                # איפוס מנהלים
+                if self.theme_manager:
+                    self.theme_manager.apply_theme("light", self)
+                if self.font_manager:
+                    self.font_manager.reset_to_default(self)
+                
+                # עדכון בקרות
+                if hasattr(self, 'light_theme_btn'):
+                    self.light_theme_btn.setChecked(True)
+                    self.dark_theme_btn.setChecked(False)
+                
+                QMessageBox.information(self, "הושלם", "כל ההגדרות אופסו לברירת מחדל")
+                
+        except Exception as e:
+            print(f"שגיאה באיפוס הגדרות: {e}")
+            QMessageBox.critical(self, "שגיאה", f"שגיאה באיפוס הגדרות: {e}")
+    
+    def on_tab_changed(self, index):
+        """טיפול בשינוי טאב עם אנימציה"""
+        try:
+            if self.animation_manager and hasattr(self, '_previous_tab_index'):
+                self.animation_manager.animate_tab_transition(
+                    self.tab_widget, 
+                    self._previous_tab_index, 
+                    index
+                )
+            self._previous_tab_index = index
+        except Exception as e:
+            print(f"שגיאה באנימציית טאב: {e}")
+        
+    def setup_shortcuts(self):
+        """הגדרת קיצורי מקלדת"""
+        # קיצורים לשלבים
+        QShortcut(QKeySequence("Alt+1"), self, self.load_manifests)
+        QShortcut(QKeySequence("Alt+2"), self, self.download_updates)
+        QShortcut(QKeySequence("Alt+3"), self, self.apply_updates)
+        
+        # קיצורי בקרה
+        QShortcut(QKeySequence("Space"), self, self.toggle_pause)
+        QShortcut(QKeySequence("Escape"), self, self.cancel_operation)
+        
+    def toggle_theme(self):
+        """החלפת ערכת צבעים (תאימות לאחור)"""
+        try:
+            if self.theme_manager:
+                self.theme_manager.toggle_theme(self)
+            else:
+                # fallback לשיטה הישנה
+                dark_mode = self.settings.value("dark_mode", False, type=bool)
+                self.settings.setValue("dark_mode", not dark_mode)
+                if hasattr(self, 'dark_mode_checkbox'):
+                    self.dark_mode_checkbox.setChecked(not dark_mode)
+                self.apply_theme_fallback()
+        except Exception as e:
+            print(f"שגיאה בהחלפת ערכת נושא: {e}")
+        
+    def apply_initial_settings(self):
+        """החלת הגדרות ראשוניות - ערכת נושא וגופן"""
+        try:
+            # החלת ערכת נושא
+            if self.theme_manager:
+                current_theme = self.theme_manager.current_theme
+                self.theme_manager.apply_theme(current_theme, self)
+            else:
+                # fallback לערכת נושא ישנה
+                self.apply_theme_fallback()
+            
+            # החלת גודל גופן
+            if self.font_manager:
+                self.font_manager.apply_font_to_widget(self)
+            
+            print("הגדרות ראשוניות הוחלו בהצלחה")
+            
+        except Exception as e:
+            print(f"שגיאה בהחלת הגדרות ראשוניות: {e}")
+            self.apply_theme_fallback()
+    
+    def apply_theme_fallback(self):
+        """החלת ערכת צבעים ישנה (fallback)"""
+        dark_mode = self.settings.value("dark_mode", False, type=bool)
+        if dark_mode:
+            # ערכת צבעים כהה
+            self.setStyleSheet("""
+                QMainWindow {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                }
+                QWidget {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                }
+                QTabWidget::pane {
+                    border: 1px solid #555555;
+                    background-color: #3c3c3c;
+                }
+                QTabBar::tab {
+                    background-color: #555555;
+                    color: #ffffff;
+                    padding: 8px 16px;
+                    margin: 2px;
+                    border-radius: 4px;
+                }
+                QTabBar::tab:selected {
+                    background-color: #4CAF50;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                    border: 2px solid #555555;
+                    border-radius: 8px;
+                    margin: 10px 0px;
+                    padding-top: 10px;
+                    background-color: #3c3c3c;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 5px 0 5px;
+                }
+                QTextEdit {
+                    background-color: #1e1e1e;
+                    border: 1px solid #555555;
+                    border-radius: 5px;
+                    color: #ffffff;
+                }
+                QLabel {
+                    color: #ffffff;
+                }
+                QCheckBox {
+                    color: #ffffff;
+                }
+                QSlider::groove:horizontal {
+                    border: 1px solid #555555;
+                    height: 8px;
+                    background: #3c3c3c;
+                    border-radius: 4px;
+                }
+                QSlider::handle:horizontal {
+                    background: #4CAF50;
+                    border: 1px solid #555555;
+                    width: 18px;
+                    margin: -2px 0;
+                    border-radius: 9px;
+                }
+            """)
+        else:
+            # ערכת צבעים בהירה
+            self.setStyleSheet("""
+                QMainWindow {
+                    background-color: #ffffff;
+                    color: #2E4057;
+                }
+                QWidget {
+                    background-color: #ffffff;
+                    color: #2E4057;
+                }
+                QTabWidget::pane {
+                    border: 1px solid #E0E0E0;
+                    background-color: #ffffff;
+                }
+                QTabBar::tab {
+                    background-color: #F5F5F5;
+                    color: #2E4057;
+                    padding: 8px 16px;
+                    margin: 2px;
+                    border-radius: 4px;
+                }
+                QTabBar::tab:selected {
+                    background-color: #4CAF50;
+                    color: white;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                    border: 2px solid #E0E0E0;
+                    border-radius: 8px;
+                    margin: 10px 0px;
+                    padding-top: 10px;
+                    background-color: #FAFAFA;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 5px 0 5px;
+                }
+                QTextEdit {
+                    background-color: #F5F5F5;
+                    border: 1px solid #CCCCCC;
+                    border-radius: 5px;
+                    color: #2E4057;
+                }
+                QSlider::groove:horizontal {
+                    border: 1px solid #CCCCCC;
+                    height: 8px;
+                    background: #F5F5F5;
+                    border-radius: 4px;
+                }
+                QSlider::handle:horizontal {
+                    background: #4CAF50;
+                    border: 1px solid #CCCCCC;
+                    width: 18px;
+                    margin: -2px 0;
+                    border-radius: 9px;
+                }
+            """)
+        
+        # עדכון אייקונים לערכת הנושא החדשה
+        theme = self.theme_manager.current_theme if self.theme_manager else ("dark" if self.settings.value("dark_mode", False, type=bool) else "light")
+        if hasattr(self, 'icon_manager'):
+            self.icon_manager.update_icons_for_theme(theme)
+        
+        # עדכון אייקונים בכפתורים הקיימים
+        self.update_button_icons()
+            
+    def update_button_icons(self):
+        """עדכון אייקונים בכפתורים לפי ערכת הנושא הנוכחית"""
+        try:
+            theme = self.theme_manager.current_theme if self.theme_manager else ("dark" if self.settings.value("dark_mode", False, type=bool) else "light")
+            
+            # עדכון כפתורים ראשיים
+            self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24, theme=theme))
+            self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24, theme=theme))
+            self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24, theme=theme))
+            
+            # עדכון כפתורי בקרה
+            if self.is_paused:
+                self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16, theme=theme))
+            else:
+                self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16, theme=theme))
+            
+            self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16, theme=theme))
+            self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16, theme=theme))
+            
+        except Exception as e:
+            print(f"שגיאה בעדכון אייקוני כפתורים: {e}")
+            
+    def change_font_size(self, size):
+        """שינוי גודל גופן"""
+        try:
+            if self.font_manager:
+                self.font_manager.set_font_size(size, self)
+            else:
+                # fallback לשיטה הישנה
+                self.settings.setValue("font_size", size)
+                font = QFont("Segoe UI", size)
+                self.setFont(font)
+                QApplication.instance().setFont(font)
+            
+            if hasattr(self, 'font_size_label'):
+                self.font_size_label.setText(str(size))
+        except Exception as e:
+            print(f"שגיאה בשינוי גודל גופן: {e}")
+        
+    def increase_font(self):
+        """הגדלת גופן"""
+        try:
+            if self.font_manager:
+                success = self.font_manager.increase_font_size(self)
+                if success and hasattr(self, 'font_slider'):
+                    self.font_slider.setValue(self.font_manager.current_font_size)
+            else:
+                # fallback לשיטה הישנה
+                current_size = self.settings.value("font_size", 10, type=int)
+                if current_size < 20:
+                    self.change_font_size(current_size + 1)
+                    if hasattr(self, 'font_slider'):
+                        self.font_slider.setValue(current_size + 1)
+        except Exception as e:
+            print(f"שגיאה בהגדלת גופן: {e}")
+                
+    def decrease_font(self):
+        """הקטנת גופן"""
+        try:
+            if self.font_manager:
+                success = self.font_manager.decrease_font_size(self)
+                if success and hasattr(self, 'font_slider'):
+                    self.font_slider.setValue(self.font_manager.current_font_size)
+            else:
+                # fallback לשיטה הישנה
+                current_size = self.settings.value("font_size", 10, type=int)
+                if current_size > 8:
+                    self.change_font_size(current_size - 1)
+                    if hasattr(self, 'font_slider'):
+                        self.font_slider.setValue(current_size - 1)
+        except Exception as e:
+            print(f"שגיאה בהקטנת גופן: {e}")
+                
+    def update_stats_display(self):
+        """עדכון תצוגת הסטטיסטיקות"""
+        if hasattr(self, 'stats_widget'):
+            # עדכון סטטיסטיקות
+            last_sync = self.settings.value("last_sync", "אף פעם")
+            if last_sync != "אף פעם":
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(last_sync)
+                    last_sync = dt.strftime("%d/%m/%Y %H:%M")
+                except:
+                    pass
+                    
+            self.stats_widget.update_stats(
+                books=self.total_books,
+                size_mb=self.total_size_mb,
+                last_sync=last_sync,
+                speed=self.current_speed
+            )
+            
+            # עדכון התקדמות כללית
+            state = self.load_sync_state()
+            current_step = state.get("step", 0)
+            overall_progress = (current_step / 3) * 100
+            self.overall_progress.setValue(int(overall_progress))
         
     # הוספת כפתור איפוס מצב
     def add_reset_button(self):
@@ -1359,10 +4058,61 @@ class OtzariaSync(QMainWindow):
                     
         except Exception as e:
             self.log(f"שגיאה בעדכון מידע זיכרון: {e}")
+            
+    def update_download_progress(self, filename, progress, speed=0, files_done=0, total_files=0):
+        """עדכון התקדמות הורדה עם פרטים נוספים"""
+        if hasattr(self.progress_bar, 'set_stats'):
+            self.progress_bar.set_stats(
+                speed=speed,
+                files_processed=files_done,
+                total_files=total_files
+            )
+        
+        # עדכון מהירות נוכחית לסטטיסטיקות
+        self.current_speed = speed
+        self.update_stats_display()
+        
+        # הודעת סטטוס מפורטת
+        if total_files > 0:
+            self.status_label.setText(f"מוריד: {filename} ({files_done}/{total_files})")
+        else:
+            self.status_label.setText(f"מוריד: {filename}")
+            
+    def animate_step_transition(self, new_step):
+        """אנימציה למעבר בין שלבים"""
+        # אנימציית fade out ו fade in של תווית השלב
+        self.step_animation = QPropertyAnimation(self.step_label, b"windowOpacity")
+        self.step_animation.setDuration(300)
+        self.step_animation.setStartValue(1.0)
+        self.step_animation.setEndValue(0.0)
+        
+        def update_step_text():
+            step_names = {
+                0: "שלב 1: טעינת קבצי נתונים",
+                1: "שלב 2: הורדת עדכונים", 
+                2: "שלב 3: החלת עדכונים",
+                3: "הושלם! כל השלבים בוצעו"
+            }
+            self.step_label.setText(f"שלב נוכחי: {step_names.get(new_step, 'לא ידוע')}")
+            
+            # אנימציית fade in
+            fade_in = QPropertyAnimation(self.step_label, b"windowOpacity")
+            fade_in.setDuration(300)
+            fade_in.setStartValue(0.0)
+            fade_in.setEndValue(1.0)
+            fade_in.start()
+        
+        self.step_animation.finished.connect(update_step_text)
+        self.step_animation.start()
 
     def log(self, message):
-        self.log_text.append(message)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}"
+        self.log_text.append(formatted_message)
         self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
+        
+        # עדכון status bar
+        self.status_bar.showMessage(message)
     
     def show_error_message(self, title, message, details=None):
         """הצגת הודעת שגיאה ידידותית למשתמש"""
@@ -1473,6 +4223,9 @@ class OtzariaSync(QMainWindow):
         self.reset_buttons()
         
         if success:
+            # אנימציה למעבר לשלב הבא
+            self.animate_step_transition(1)
+            
             # שמירת מצב עם נתונים נוספים
             state_data = {
                 "step": 1,
@@ -1480,13 +4233,20 @@ class OtzariaSync(QMainWindow):
                 "last_sync_time": datetime.now().isoformat()
             }
             self.save_sync_state(state_data)
+            self.settings.setValue("last_sync", datetime.now().isoformat())
+            
             self.btn_download_updates.setEnabled(True)
             self.log("שלב 1 הושלם - קבצי המניפסט נטענו")
+            
+            # עדכון סטטיסטיקות
+            self.update_stats_display()
+            
             QMessageBox.information(self, "הצלחה", message)
         else:
             self.btn_load_manifests.setEnabled(True)
             # שמירת מצב גם במקרה של שגיאה כדי לאפשר המשך
-            self.save_state({"step": 0, "error": message})
+            state_data = {"step": 0, "error": message}
+            self.save_sync_state(state_data)
             QMessageBox.critical(self, "שגיאה", message)
     
     def download_updates(self):
@@ -1543,6 +4303,9 @@ class OtzariaSync(QMainWindow):
                 self.log("אין קבצים חדשים - ניתן לבדוק שוב מאוחר יותר")
                 QMessageBox.information(self, "מעודכן", message)
             else:
+                # אנימציה למעבר לשלב הבא
+                self.animate_step_transition(2)
+                
                 # יש קבצים שהורדו - עובר לשלב הבא
                 state_data = {
                     "step": 2,
@@ -1551,8 +4314,14 @@ class OtzariaSync(QMainWindow):
                     "last_sync_time": datetime.now().isoformat()
                 }
                 self.save_sync_state(state_data)
+                self.settings.setValue("last_sync", datetime.now().isoformat())
+                
                 self.btn_apply_updates.setEnabled(True)
                 self.log("שלב 2 הושלם - עדכונים הורדו")
+                
+                # עדכון סטטיסטיקות
+                self.update_stats_display()
+                
                 QMessageBox.information(self, "הצלחה", message)
         else:
             self.btn_download_updates.setEnabled(True)
@@ -1601,6 +4370,9 @@ class OtzariaSync(QMainWindow):
         self.reset_buttons()
         
         if success:
+            # אנימציה לסיום כל השלבים
+            self.animate_step_transition(3)
+            
             # שמירת מצב השלמה
             state_data = {
                 "step": 3,
@@ -1611,13 +4383,34 @@ class OtzariaSync(QMainWindow):
                 "last_sync_time": datetime.now().isoformat()
             }
             self.save_sync_state(state_data)
+            self.settings.setValue("last_sync", datetime.now().isoformat())
             
             # איפוס הכפתורים לתחילת המחזור
             self.btn_load_manifests.setEnabled(True)
             self.btn_download_updates.setEnabled(False)
             self.btn_apply_updates.setEnabled(False)
+            
+            # עדכון סטטיסטיקות סופי
+            self.update_stats_display()
+            
             self.log("כל השלבים הושלמו בהצלחה!")
-            QMessageBox.information(self, "הצלחה", message)
+            
+            pixmap = QPixmap(64, 64)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setFont(QFont("Segoe UI Emoji", 48))
+            painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "📖")
+            painter.end()
+
+            # הודעת הצלחה עם אפקט חזותי
+            success_msg = QMessageBox(self)
+            success_msg.setIcon(QMessageBox.Icon.Information)
+            success_msg.setWindowTitle("!הצלחה 🎉")
+            success_msg.setIconPixmap(pixmap)
+            success_msg.setText("הסנכרון הושלם בהצלחה!!\n"
+                                "כל הספרים נכנסו לתוך תוכנת אוצריא")
+            success_msg.exec()
+            
         else:
             self.btn_apply_updates.setEnabled(True)
             # שמירת מצב שגיאה
@@ -1640,6 +4433,7 @@ class OtzariaSync(QMainWindow):
             
             if self.is_paused:
                 self.btn_pause.setText("המשך")
+                self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16))
                 self.btn_pause.setStyleSheet("""
                     QPushButton {
                         background-color: #4CAF50;
@@ -1653,8 +4447,10 @@ class OtzariaSync(QMainWindow):
                     }
                 """)
                 self.status_label.setText("פעולה מושהית")
+                self.log("פעולה הושהתה")  # רישום פעם אחת בלבד
             else:
                 self.btn_pause.setText("השהה")
+                self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
                 self.btn_pause.setStyleSheet("""
                     QPushButton {
                         background-color: #FF9800;
@@ -1668,6 +4464,7 @@ class OtzariaSync(QMainWindow):
                     }
                 """)
                 self.status_label.setText("פעולה מתבצעת")
+                self.log("פעולה הומשכה")  # רישום פעם אחת בלבד
     
     def cancel_operation(self):
         if self.worker and self.worker.isRunning():
@@ -1700,11 +4497,211 @@ class OtzariaSync(QMainWindow):
         self.is_paused = False
         self.is_cancelled = False            
 
+    # פונקציות אינטגרציה למנהלים
+    def toggle_theme_mode(self):
+        """החלפה בין מצב כהה לבהיר"""
+        try:
+            if self.theme_manager:
+                success = self.theme_manager.toggle_theme(self)
+                if success:
+                    theme_name = "כהה" if self.theme_manager.current_theme == "dark" else "בהיר"
+                    self.status_bar.showMessage(f"עבר למצב {theme_name}", 2000)
+                    return True
+            else:
+                # fallback למצב ישן
+                current_dark_mode = self.settings.value("dark_mode", False, type=bool)
+                new_dark_mode = not current_dark_mode
+                self.settings.setValue("dark_mode", new_dark_mode)
+                self.apply_theme_fallback()
+                theme_name = "כהה" if new_dark_mode else "בהיר"
+                self.status_bar.showMessage(f"עבר למצב {theme_name}", 2000)
+                return True
+        except Exception as e:
+            print(f"שגיאה בהחלפת ערכת נושא: {e}")
+            return False
+    
+    def increase_font_size(self):
+        """הגדלת גודל גופן"""
+        try:
+            if self.font_manager:
+                success = self.font_manager.increase_font_size(self)
+                if success:
+                    self.status_bar.showMessage(f"גודל גופן: {self.font_manager.current_font_size}", 2000)
+                return success
+            return False
+        except Exception as e:
+            print(f"שגיאה בהגדלת גופן: {e}")
+            return False
+    
+    def decrease_font_size(self):
+        """הקטנת גודל גופן"""
+        try:
+            if self.font_manager:
+                success = self.font_manager.decrease_font_size(self)
+                if success:
+                    self.status_bar.showMessage(f"גודל גופן: {self.font_manager.current_font_size}", 2000)
+                return success
+            return False
+        except Exception as e:
+            print(f"שגיאה בהקטנת גופן: {e}")
+            return False
+    
+    def animate_progress_update(self, value):
+        """עדכון מד התקדמות עם אנימציה"""
+        try:
+            if hasattr(self.progress_bar, 'update_progress_animated'):
+                self.progress_bar.update_progress_animated(value)
+            else:
+                self.progress_bar.setValue(value)
+        except Exception as e:
+            print(f"שגיאה באנימציית התקדמות: {e}")
+            self.progress_bar.setValue(value)
+    
+    def update_detailed_progress(self, **kwargs):
+        """עדכון מד התקדמות עם פרטים מלאים"""
+        try:
+            if hasattr(self.progress_bar, 'set_detailed_stats'):
+                self.progress_bar.set_detailed_stats(**kwargs)
+            
+            # עדכון סטטיסטיקות מתקדמות אם קיימות
+            if hasattr(self, 'stats_widget') and hasattr(self.stats_widget, 'update_real_time_stats'):
+                self.stats_widget.update_real_time_stats(kwargs)
+                
+        except Exception as e:
+            print(f"שגיאה בעדכון התקדמות מפורטת: {e}")
+    
+    def create_animated_button(self, text, icon_name=None):
+        """יצירת כפתור מונפש עם אייקון"""
+        try:
+            button = AnimatedButton(text)
+            
+            if icon_name and self.icon_manager:
+                icon = self.icon_manager.get_icon(icon_name, size=24)
+                if icon and not icon.isNull():
+                    button.setIcon(icon)
+                    button.setIconSize(QSize(24, 24))
+            
+            return button
+            
+        except Exception as e:
+            print(f"שגיאה ביצירת כפתור מונפש: {e}")
+            return QPushButton(text)
+    
+    def show_keyboard_shortcuts_help(self):
+        """הצגת עזרה לקיצורי מקלדת"""
+        try:
+            if self.shortcut_manager:
+                self.shortcut_manager.show_help_dialog()
+            else:
+                # fallback לעזרה בסיסית
+                QMessageBox.information(
+                    self,
+                    "קיצורי מקלדת",
+                    "קיצורי מקלדת בסיסיים:\n\n"
+                    "Ctrl+S - התחלת סנכרון\n"
+                    "Ctrl+P - השהיה/המשכה\n"
+                    "Ctrl+Q - יציאה\n"
+                    "F1 - עזרה זו"
+                )
+        except Exception as e:
+            print(f"שגיאה בהצגת עזרה: {e}")
+    
+    def get_current_theme_info(self):
+        """קבלת מידע על ערכת הנושא הנוכחית"""
+        try:
+            if self.theme_manager:
+                return {
+                    "theme": self.theme_manager.current_theme,
+                    "colors": self.theme_manager.get_current_theme_colors()
+                }
+            else:
+                return {
+                    "theme": "dark" if self.settings.value("dark_mode", False, type=bool) else "light",
+                    "colors": {}
+                }
+        except Exception as e:
+            print(f"שגיאה בקבלת מידע ערכת נושא: {e}")
+            return {"theme": "light", "colors": {}}
+    
+    def get_font_info(self):
+        """קבלת מידע על הגופן הנוכחי"""
+        try:
+            if self.font_manager:
+                return self.font_manager.get_font_info()
+            else:
+                return {
+                    "current_size": self.settings.value("font_size", 10, type=int),
+                    "base_size": 10,
+                    "min_size": 8,
+                    "max_size": 20
+                }
+        except Exception as e:
+            print(f"שגיאה בקבלת מידע גופן: {e}")
+            return {"current_size": 10, "base_size": 10}
+    
+    def export_current_stats(self):
+        """ייצוא סטטיסטיקות נוכחיות"""
+        try:
+            if hasattr(self, 'stats_widget') and hasattr(self.stats_widget, 'export_stats'):
+                filename = self.stats_widget.export_stats()
+                if filename:
+                    QMessageBox.information(
+                        self,
+                        "ייצוא הושלם",
+                        f"הסטטיסטיקות יוצאו בהצלחה לקובץ:\n{filename}"
+                    )
+                    return filename
+            return None
+        except Exception as e:
+            print(f"שגיאה בייצוא סטטיסטיקות: {e}")
+            return None
+    
     # פונקציה לטעינת אייקון ממחרוזת Base64
     def load_icon_from_base64(self, base64_string):
         pixmap = QPixmap()
         pixmap.loadFromData(base64.b64decode(base64_string))
         return QIcon(pixmap)
+        
+    def closeEvent(self, event):
+        """טיפול בסגירת האפליקציה"""
+        # שמירת הגדרות כל המנהלים
+        try:
+            if self.theme_manager:
+                self.theme_manager.save_theme_preference()
+            else:
+                # fallback לשמירה ישנה
+                dark_mode = self.settings.value("dark_mode", False, type=bool)
+                self.settings.setValue("dark_mode", dark_mode)
+            
+            if self.font_manager:
+                self.font_manager.save_font_size()
+            else:
+                # fallback לשמירה ישנה
+                font_size = self.settings.value("font_size", 10, type=int)
+                self.settings.setValue("font_size", font_size)
+            
+            # סנכרון הגדרות
+            self.settings.sync()
+            
+        except Exception as e:
+            print(f"שגיאה בשמירת הגדרות: {e}")
+        
+        # בדיקה אם יש פעולה פעילה
+        if self.worker and self.worker.isRunning():
+            reply = QMessageBox.question(self, "סגירת האפליקציה",
+                                        "יש פעולה פעילה. האם אתה בטוח שברצונך לסגור?",
+                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                # עצירת הפעולה
+                if self.worker:
+                    self.worker.stop_search = True
+                    self.worker.wait(3000)  # המתנה של 3 שניות
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
 def check_dependencies():
     """בדיקת תלויות נדרשות"""
@@ -1728,14 +4725,27 @@ def main():
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     app = QApplication(sys.argv)
     
-    # הגדרת גופן עברי
-    font = QFont("Segoe UI", 10)
-    app.setFont(font)
-    
     # הגדרת כיוון RTL
     app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
     
     window = OtzariaSync()
+    
+    # הגדרת גופן עברי בהתאם להגדרות המשתמש
+    try:
+        if window.font_manager:
+            font_size = window.font_manager.current_font_size
+        else:
+            font_size = window.settings.value("font_size", 10, type=int)
+        
+        font = QFont("Segoe UI", font_size)
+        app.setFont(font)
+        window.setFont(font)
+    except Exception as e:
+        print(f"שגיאה בהגדרת גופן: {e}")
+        # fallback לגופן ברירת מחדל
+        font = QFont("Segoe UI", 10)
+        app.setFont(font)
+        window.setFont(font)
     
     # הודעה על חסרון תלויות
     if not has_all_deps:
