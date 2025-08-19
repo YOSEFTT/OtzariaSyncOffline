@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                            QMenu, QStatusBar, QSplitter, QTabWidget, QScrollArea)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup, QSequentialAnimationGroup, pyqtProperty, QSettings, QPoint, QSize
 from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, QAction, QShortcut, QPainter
+from PyQt6.QtWidgets import QGraphicsOpacityEffect
 import base64
 import concurrent.futures
 import threading
@@ -1452,7 +1453,13 @@ class WorkerThread(QThread):
         pixmap.loadFromData(base64.b64decode(icon_base64))
         return QIcon(pixmap)
 class AnimatedButton(QPushButton):
-    """כפתור עם אנימציות חלקות משופרות"""
+    """כפתור עם אנימציות חלקות משופרות
+    
+    שינויים חדשים:
+    - כפתורים לא פעילים לא מגיבים ל-hover (לא גדלים ולא משתנים)
+    - כפתורים לא פעילים מוצגים באותו צבע המקורי אבל מוחלש באמצעות QGraphicsOpacityEffect
+    - ניתן להתאים את רמת השקיפות באמצעות set_disabled_opacity()
+    """
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         
@@ -1488,6 +1495,9 @@ class AnimatedButton(QPushButton):
         self.shadow_enabled = True
         self.glow_enabled = False
         
+        # אפקט שקיפות לכפתורים לא פעילים
+        self.disabled_opacity = 0.4  # רמת השקיפות לכפתורים לא פעילים
+        
     def set_animation_manager(self, animation_manager):
         """הגדרת מנהל האנימציות"""
         self.animation_manager = animation_manager
@@ -1496,9 +1506,64 @@ class AnimatedButton(QPushButton):
         """הגדרת סגנונות לכל המצבים"""
         self.original_style = original
         self.hover_style = hover
+        # עכשיו לא נשתמש בסגנון disabled נפרד, אלא באפקט שקיפות
         self.disabled_style = disabled or original
         self.pressed_style = pressed or hover
+        
+        # הגדרת הסגנון הנוכחי בהתאם למצב הכפתור
         self.setStyleSheet(original)
+        
+        # עדכון אפקט השקיפות בהתאם למצב הכפתור
+        self._update_opacity_effect()
+    
+    def _create_faded_style(self, original_style):
+        """יצירת סגנון מוחלש מהסגנון המקורי"""
+        try:
+            # נוסיף opacity לכל הכפתור כדי ליצור אפקט מוחלש
+            if "opacity:" in original_style:
+                # אם כבר יש opacity, נחליף אותו
+                import re
+                faded_style = re.sub(r'opacity:\s*[\d.]+;', 'opacity: 0.5;', original_style)
+            else:
+                # נוסיף opacity חדש
+                faded_style = original_style.replace("QPushButton {", "QPushButton { opacity: 0.5;")
+            
+            return faded_style
+        except:
+            # במקרה של שגיאה, נחזיר את הסגנון המקורי עם opacity
+            return original_style.replace("QPushButton {", "QPushButton { opacity: 0.5;")
+    
+    def setEnabled(self, enabled):
+        """עדכון מצב הכפתור עם אפקט שקיפות"""
+        super().setEnabled(enabled)
+        self._update_opacity_effect()
+    
+    def _update_opacity_effect(self):
+        """עדכון אפקט השקיפות בהתאם למצב הכפתור"""
+        if self.isEnabled():
+            # כפתור פעיל - הסרת אפקט שקיפות
+            self.setGraphicsEffect(None)
+        else:
+            # כפתור לא פעיל - הוספת אפקט שקיפות
+            opacity_effect = QGraphicsOpacityEffect()
+            opacity_effect.setOpacity(self.disabled_opacity)
+            self.setGraphicsEffect(opacity_effect)
+    
+    def set_disabled_opacity(self, opacity):
+        """הגדרת רמת השקיפות לכפתורים לא פעילים
+        
+        Args:
+            opacity (float): רמת השקיפות בין 0.1 (שקוף מאוד) ל-1.0 (אטום)
+                           ערכים נמוכים יותר = כפתור יותר מוחלש
+        
+        דוגמה:
+            button.set_disabled_opacity(0.3)  # כפתור מוחלש מאוד
+            button.set_disabled_opacity(0.6)  # כפתור מוחלש בינוני
+        """
+        self.disabled_opacity = max(0.1, min(1.0, opacity))  # בין 0.1 ל-1.0
+        
+        # עדכון האפקט אם הכפתור כרגע לא פעיל
+        self._update_opacity_effect()
     
     def set_animation_settings(self, hover_scale=1.02, click_scale=0.98, duration=150):
         """הגדרת פרמטרי אנימציה"""
@@ -1541,7 +1606,11 @@ class AnimatedButton(QPushButton):
     def enterEvent(self, event):
         """אירוע כניסה של העכבר"""
         try:
-            if not self.isEnabled() or self.is_animating:
+            # אם הכפתור לא פעיל - לא לעשות כלום (לא hover ולא אנימציה)
+            if not self.isEnabled():
+                return
+                
+            if self.is_animating:
                 return
             
             self.hover_animation_active = True
@@ -1570,8 +1639,12 @@ class AnimatedButton(QPushButton):
             super().enterEvent(event)
     
     def leaveEvent(self, event):
-        """אירוע יציאה של העכבר"""
+        """אירוع יציאה של העכבר"""
         try:
+            # אם הכפתור לא פעיל - לא לעשות כלום
+            if not self.isEnabled():
+                return
+                
             self.hover_animation_active = False
             
             # החלפת סגנון מיידית
@@ -1602,6 +1675,7 @@ class AnimatedButton(QPushButton):
     def mousePressEvent(self, event):
         """אירוע לחיצה על הכפתור"""
         try:
+            # אם הכפתור לא פעיל - לא לעשות כלום
             if not self.isEnabled():
                 return
             
@@ -1641,23 +1715,15 @@ class AnimatedButton(QPushButton):
         try:
             if event.type() == event.Type.EnabledChange:
                 if self.isEnabled():
-                    # אנימציית הופעה
+                    # כפתור הופך לפעיל - חזרה לסגנון רגיל
                     self.setStyleSheet(self.original_style)
-                    if self.animation_manager:
-                        animation = self.animation_manager.create_fade_animation(
-                            self, duration=200, start_opacity=0.5, end_opacity=1.0
-                        )
-                        if animation:
-                            animation.start()
+                    # הסרת אפקט השקיפות
+                    self.setGraphicsEffect(None)
                 else:
-                    # אנימציית היעלמות
-                    self.setStyleSheet(self.disabled_style)
-                    if self.animation_manager:
-                        animation = self.animation_manager.create_fade_animation(
-                            self, duration=200, start_opacity=1.0, end_opacity=0.6
-                        )
-                        if animation:
-                            animation.start()
+                    # כפתור הופך ללא פעיל - שימוש בסגנון מקורי עם אפקט שקיפות
+                    self.setStyleSheet(self.original_style)
+                    # עדכון אפקט השקיפות
+                    self._update_opacity_effect()
             
             super().changeEvent(event)
             
@@ -1668,7 +1734,8 @@ class AnimatedButton(QPushButton):
     def _animate_scale(self, start_scale, end_scale):
         """אנימציית הגדלה/הקטנה בסיסית (fallback)"""
         try:
-            if self.is_animating:
+            # אם הכפתור לא פעיל - לא לעשות אנימציה
+            if not self.isEnabled() or self.is_animating:
                 return
             
             self.is_animating = True
@@ -2099,15 +2166,12 @@ class ThemeManager:
                     font-weight: bold;
                     padding: 10px;
                 }}
-                QPushButton:disabled {{
-                    background-color: {theme['button_colors']['disabled']};
-                    color: #666666;
-                }}
             """
             
             # יצירת hover style עם צבע מעט יותר בהיר
             hover_style = original_style  # הסרת transform שגורם לשגיאות
             
+            # הגדרת הסגנונות עם הסגנון המוחלש החדש
             button.set_styles(original_style, hover_style)
             
         except Exception as e:
@@ -2129,8 +2193,7 @@ class ThemeManager:
                     background-color: {theme['secondary_color']};
                 }}
                 QPushButton:disabled {{
-                    background-color: {theme['button_colors']['disabled']};
-                    color: #666666;
+                    opacity: 0.6;
                 }}
             """
             button.setStyleSheet(style)
@@ -2947,8 +3010,8 @@ class OtzariaSync(QMainWindow):
         
         # כפתורים משופרים עם אייקונים
         self.btn_load_manifests = AnimatedButton("טען קבצי נתוני ספרים")
-        self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24))
-        self.btn_load_manifests.setIconSize(QSize(24, 24))
+        # self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24))
+        # self.btn_load_manifests.setIconSize(QSize(24, 24))
         self.btn_load_manifests.setToolTip("מחפש את תיקיית אוצריא במחשב, וטוען את קבצי המניפסט מתיקיית התוכנה\nקיצור מקלדת: Ctrl+S")
         self.btn_load_manifests.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_load_manifests.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -2961,10 +3024,6 @@ class OtzariaSync(QMainWindow):
                 font-size: 16px;
                 font-weight: bold;
                 padding: 10px;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-                color: #666666;
             }
         """
         hover_style = """
@@ -2979,12 +3038,13 @@ class OtzariaSync(QMainWindow):
             }
         """
         self.btn_load_manifests.set_styles(original_style, hover_style)
+        self.btn_load_manifests.set_disabled_opacity(0.3)  # שקיפות חזקה יותר
         self.btn_load_manifests.clicked.connect(self.load_manifests)
         
         # כפתור 2
         self.btn_download_updates = AnimatedButton("הורד קבצים חדשים וקבצים שהתעדכנו")
-        self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24))
-        self.btn_download_updates.setIconSize(QSize(24, 24))
+        # self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24))
+        # self.btn_download_updates.setIconSize(QSize(24, 24))
         self.btn_download_updates.setToolTip("מוריד קבצים חדשים ומעודכנים מהשרת\nזמין רק לאחר טעינת קבצי הנתונים")
         self.btn_download_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_download_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -2997,10 +3057,6 @@ class OtzariaSync(QMainWindow):
                 font-size: 16px;
                 font-weight: bold;
                 padding: 10px;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-                color: #666666;
             }
         """
         hover_style2 = """
@@ -3015,13 +3071,14 @@ class OtzariaSync(QMainWindow):
             }
         """
         self.btn_download_updates.set_styles(original_style2, hover_style2)
+        self.btn_download_updates.set_disabled_opacity(0.3)  # שקיפות חזקה יותר
         self.btn_download_updates.clicked.connect(self.download_updates)
         self.btn_download_updates.setEnabled(False)
         
         # כפתור 3
         self.btn_apply_updates = AnimatedButton("עדכן שינויים לתוך מאגר הספרים")
-        self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24))
-        self.btn_apply_updates.setIconSize(QSize(24, 24))
+        # self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24))
+        # self.btn_apply_updates.setIconSize(QSize(24, 24))
         self.btn_apply_updates.setToolTip("מעתיק את הקבצים החדשים לתיקיית אוצריא\nזמין רק לאחר הורדת העדכונים")
         self.btn_apply_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_apply_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -3034,10 +3091,6 @@ class OtzariaSync(QMainWindow):
                 font-size: 16px;
                 font-weight: bold;
                 padding: 10px;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-                color: #666666;
             }
         """
         hover_style3 = """
@@ -3052,6 +3105,7 @@ class OtzariaSync(QMainWindow):
             }
         """
         self.btn_apply_updates.set_styles(original_style3, hover_style3)
+        self.btn_apply_updates.set_disabled_opacity(0.3)  # שקיפות חזקה יותר
         self.btn_apply_updates.clicked.connect(self.apply_updates)
         self.btn_apply_updates.setEnabled(False)
         
@@ -3059,8 +3113,8 @@ class OtzariaSync(QMainWindow):
         control_layout = QHBoxLayout()
         
         self.btn_pause = QPushButton("השהה")
-        self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
-        self.btn_pause.setIconSize(QSize(16, 16))
+        # self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
+        # self.btn_pause.setIconSize(QSize(16, 16))
         self.btn_pause.setToolTip("השהה או המשך את התהליך הנוכחי\nקיצור מקלדת: Ctrl+P")
         self.btn_pause.setMinimumHeight(40)
         self.btn_pause.setStyleSheet("""
@@ -3079,8 +3133,8 @@ class OtzariaSync(QMainWindow):
         self.btn_pause.setEnabled(False)
         
         self.btn_cancel = QPushButton("בטל")
-        self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16))
-        self.btn_cancel.setIconSize(QSize(16, 16))
+        # self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16))
+        # self.btn_cancel.setIconSize(QSize(16, 16))
         self.btn_cancel.setToolTip("בטל את התהליך הנוכחי\nקיצור מקלדת: Escape")
         self.btn_cancel.setMinimumHeight(40)
         self.btn_cancel.setStyleSheet("""
@@ -3099,8 +3153,8 @@ class OtzariaSync(QMainWindow):
         self.btn_cancel.setEnabled(False)
 
         self.btn_reset_data = QPushButton("איפוס מצב")
-        self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16))
-        self.btn_reset_data.setIconSize(QSize(16, 16))
+        # self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16))
+        # self.btn_reset_data.setIconSize(QSize(16, 16))
         self.btn_reset_data.setToolTip("מאפס את מצב ההתקדמות ומתחיל מחדש\nקיצור מקלדת: Ctrl+R")
         self.btn_reset_data.setMinimumHeight(40)
         self.btn_reset_data.setStyleSheet("""
@@ -4450,7 +4504,7 @@ class OtzariaSync(QMainWindow):
                 self.log("פעולה הושהתה")  # רישום פעם אחת בלבד
             else:
                 self.btn_pause.setText("השהה")
-                self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
+                # self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
                 self.btn_pause.setStyleSheet("""
                     QPushButton {
                         background-color: #FF9800;
