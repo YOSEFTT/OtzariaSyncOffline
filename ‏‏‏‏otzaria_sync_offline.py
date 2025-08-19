@@ -1979,11 +1979,11 @@ class ThemeManager:
             "background_color": "#FFFFFF",
             "text_color": "#2E4057",
             "primary_color": "#4CAF50",
-            "secondary_color": "#2196F3",
+            "secondary_color": "#00BCD4",
             "accent_color": "#FF9800",
             "button_colors": {
                 "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4CAF50, stop:1 #45a049)",
-                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #00BCD4, stop:1 #0097A7)",
                 "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
                 "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f44336, stop:1 #da190b)",
                 "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
@@ -2012,11 +2012,11 @@ class ThemeManager:
             "background_color": "#2B2B2B",
             "text_color": "#FFFFFF",
             "primary_color": "#66BB6A",
-            "secondary_color": "#42A5F5",
+            "secondary_color": "#00BCD4",
             "accent_color": "#FFB74D",
             "button_colors": {
                 "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66BB6A, stop:1 #4CAF50)",
-                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4DD0E1, stop:1 #00BCD4)",
                 "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
                 "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #EF5350, stop:1 #f44336)",
                 "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
@@ -2180,22 +2180,83 @@ class ThemeManager:
     def _update_regular_button_theme(self, button, theme):
         """עדכון כפתור רגיל לערכת נושא"""
         try:
-            style = f"""
-                QPushButton {{
-                    background-color: {theme['primary_color']};
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    font-size: 12px;
-                    padding: 5px 10px;
-                }}
-                QPushButton:hover {{
-                    background-color: {theme['secondary_color']};
-                }}
-                QPushButton:disabled {{
-                    opacity: 0.6;
-                }}
-            """
+            # בדיקה אם הכפתור צריך לשמור על הצבעים הספציפיים שלו
+            button_text = button.text()
+            
+            # כפתורים שצריכים לשמור על הצבעים הספציפיים שלהם
+            if button_text == "איפוס מצב":
+                # כפתור איפוס מצב - סגול
+                style = """
+                    QPushButton {
+                        background-color: #9C27B0;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 12px;
+                        padding: 5px 10px;
+                    }
+                    QPushButton:hover {
+                        background-color: #7B1FA2;
+                    }
+                    QPushButton:disabled {
+                        opacity: 0.6;
+                    }
+                """
+            elif button_text == "בטל":
+                # כפתור ביטול - אדום
+                style = """
+                    QPushButton {
+                        background-color: #f44336;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 12px;
+                        padding: 5px 10px;
+                    }
+                    QPushButton:hover {
+                        background-color: #da190b;
+                    }
+                    QPushButton:disabled {
+                        opacity: 0.6;
+                    }
+                """
+            elif button_text in ["השהה", "המשך"]:
+                # כפתור השהיה/המשך - כתום
+                style = """
+                    QPushButton {
+                        background-color: #FF9800;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 12px;
+                        padding: 5px 10px;
+                    }
+                    QPushButton:hover {
+                        background-color: #F57C00;
+                    }
+                    QPushButton:disabled {
+                        opacity: 0.6;
+                    }
+                """
+            else:
+                # כפתורים רגילים - צבעי הערכה
+                style = f"""
+                    QPushButton {{
+                        background-color: {theme['primary_color']};
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 12px;
+                        padding: 5px 10px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {theme['secondary_color']};
+                    }}
+                    QPushButton:disabled {{
+                        opacity: 0.6;
+                    }}
+                """
+            
             button.setStyleSheet(style)
         except Exception as e:
             print(f"שגיאה בעדכון כפתור רגיל: {e}")
@@ -2645,6 +2706,7 @@ class ShortcutManager:
             
             # קיצורי ערכת נושא וגופן
             self.add_shortcut("Ctrl+D", self._toggle_theme, "החלפה בין מצב כהה לבהיר")
+            self.add_shortcut("Ctrl+Shift+R", self._refresh_theme, "רענון ערכת נושא")
             self.add_shortcut("Ctrl++", self._increase_font, "הגדלת גודל גופן")
             self.add_shortcut("Ctrl+-", self._decrease_font, "הקטנת גודל גופן")
             self.add_shortcut("Ctrl+0", self._reset_font, "איפוס גודל גופן לברירת מחדל")
@@ -2746,6 +2808,15 @@ class ShortcutManager:
                 self.main_window.theme_manager.toggle_theme(self.main_window)
         except Exception as e:
             print(f"שגיאה בהחלפת ערכת נושא: {e}")
+    
+    def _refresh_theme(self):
+        """רענון ערכת נושא"""
+        try:
+            if hasattr(self.main_window, 'refresh_theme'):
+                self.main_window.refresh_theme()
+                self.main_window.status_bar.showMessage("ערכת הנושא רוענה", 2000)
+        except Exception as e:
+            print(f"שגיאה ברענון ערכת נושא: {e}")
     
     def _increase_font(self):
         """הגדלת גודל גופן"""
@@ -3050,7 +3121,7 @@ class OtzariaSync(QMainWindow):
         self.btn_download_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         original_style2 = """
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #00BCD4, stop:1 #0097A7);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -3061,7 +3132,7 @@ class OtzariaSync(QMainWindow):
         """
         hover_style2 = """
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #26C6DA, stop:1 #00BCD4);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -3393,6 +3464,7 @@ class OtzariaSync(QMainWindow):
         Alt+2 - שלב שני (הורדת עדכונים)
         Alt+3 - שלב שלישי (החלת עדכונים)
         Ctrl+T - החלף ערכת צבעים
+        Ctrl+Shift+R - רענון ערכת נושא
         Ctrl+R - איפוס מצב
         Ctrl++ - הגדל גופן
         Ctrl+- - הקטן גופן
@@ -3673,6 +3745,19 @@ class OtzariaSync(QMainWindow):
             
         except Exception as e:
             print(f"שגיאה בהחלת הגדרות ראשוניות: {e}")
+            self.apply_theme_fallback()
+    
+    def refresh_theme(self):
+        """רענון ערכת נושא - לשימוש לאחר תיקונים"""
+        try:
+            if self.theme_manager:
+                current_theme = self.theme_manager.current_theme
+                self.theme_manager.apply_theme(current_theme, self)
+                print("ערכת הנושא רוענה בהצלחה")
+            else:
+                self.apply_theme_fallback()
+        except Exception as e:
+            print(f"שגיאה ברענון ערכת נושא: {e}")
             self.apply_theme_fallback()
     
     def apply_theme_fallback(self):
