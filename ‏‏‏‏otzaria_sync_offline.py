@@ -1979,11 +1979,11 @@ class ThemeManager:
             "background_color": "#FFFFFF",
             "text_color": "#2E4057",
             "primary_color": "#4CAF50",
-            "secondary_color": "#00BCD4",
+            "secondary_color": "#2196F3",
             "accent_color": "#FF9800",
             "button_colors": {
                 "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4CAF50, stop:1 #45a049)",
-                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #00BCD4, stop:1 #0097A7)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2)",
                 "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
                 "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f44336, stop:1 #da190b)",
                 "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00)",
@@ -2012,11 +2012,11 @@ class ThemeManager:
             "background_color": "#2B2B2B",
             "text_color": "#FFFFFF",
             "primary_color": "#66BB6A",
-            "secondary_color": "#00BCD4",
+            "secondary_color": "#42A5F5",
             "accent_color": "#FFB74D",
             "button_colors": {
                 "primary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #66BB6A, stop:1 #4CAF50)",
-                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4DD0E1, stop:1 #00BCD4)",
+                "secondary": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3)",
                 "accent": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
                 "danger": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #EF5350, stop:1 #f44336)",
                 "warning": "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFB74D, stop:1 #FF9800)",
@@ -3121,7 +3121,7 @@ class OtzariaSync(QMainWindow):
         self.btn_download_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         original_style2 = """
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #00BCD4, stop:1 #0097A7);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2196F3, stop:1 #1976D2);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -3132,7 +3132,7 @@ class OtzariaSync(QMainWindow):
         """
         hover_style2 = """
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #26C6DA, stop:1 #00BCD4);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42A5F5, stop:1 #2196F3);
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -4572,7 +4572,7 @@ class OtzariaSync(QMainWindow):
             
             if self.is_paused:
                 self.btn_pause.setText("המשך")
-                self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16))
+                # self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16))
                 self.btn_pause.setStyleSheet("""
                     QPushButton {
                         background-color: #4CAF50;
