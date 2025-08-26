@@ -24,6 +24,7 @@ from urllib.parse import urljoin
 import time
 import random
 from datetime import datetime
+import psutil
 
 BASE_URL = "https://raw.githubusercontent.com/zevisvei/otzaria-library/refs/heads/main/"
 BASE_PATH = "אוצריא"
