@@ -824,6 +824,8 @@ class WorkerThread(QThread):
         self.task_type = task_type
         self.stop_search = False  # דגל לעצירת חיפוש
         self.is_paused = False  # דגל להשהיה
+        self.manual_selected = False  # דגל לבחירה ידנית
+        self.pause_message_sent = False  # דגל למניעת הודעות השהיה חוזרות
         self.args = args
         self.session = requests.Session()  # שימוש ב session לחיבורים מתמשכים
         
@@ -924,22 +926,50 @@ class WorkerThread(QThread):
             
             try:
                 APP_DATA = os.getenv("APPDATA")
-                FILE_PATH = os.path.join(APP_DATA, "com.example", "otzaria", "app_preferences.isar")
-                
-                if os.path.exists(FILE_PATH):
-                    with open(FILE_PATH, "rb") as f:
-                        content = f.read().decode("utf-8", errors="ignore")
-                    pattern = re.compile(r'key-library-path.*?"([^"]+)"', re.DOTALL)
-                    m = pattern.search(content)
-                    if m:
-                        preferences_path = m.group(1).replace("/", "\\")
-                        if os.path.exists(preferences_path) and validate_otzaria_folder(preferences_path):
-                            LOCAL_PATH = preferences_path
-                            self.status.emit(f"נמצאה תיקיית אוצריא מקובץ ההגדרות של תוכנת אוצריא: {LOCAL_PATH}")
-                            self.copy_manifests_and_finish()
-                            return
+                if APP_DATA:
+                    self.status.emit(f"מחפש בתיקיית APPDATA: {APP_DATA}")
+                    # טיפול בנתיבים עם תווים בעברית
+                    try:
+                        # ניסיון לקודד את הנתיב כ-UTF-8
+                        APP_DATA = APP_DATA.encode('utf-8').decode('utf-8')
+                    except (UnicodeDecodeError, UnicodeEncodeError):
+                        # אם יש בעיה בקידוד, ננסה להשתמש בנתיב הגולמי
+                        self.status.emit("זוהתה בעיה בקידוד נתיב APPDATA, משתמש בנתיב הגולמי")
+                    
+                    FILE_PATH = os.path.join(APP_DATA, "com.example", "otzaria", "app_preferences.isar")
+                    self.status.emit(f"מחפש קובץ העדפות: {FILE_PATH}")
+                    
+                    if os.path.exists(FILE_PATH):
+                        self.status.emit("נמצא קובץ העדפות, מנסה לקרוא...")
+                        try:
+                            with open(FILE_PATH, "rb") as f:
+                                content = f.read()
+                            
+                            # ניסיון פענוח עם קידודים שונים
+                            decoded_content = None
+                            for encoding in ['utf-8', 'utf-16', 'cp1255', 'iso-8859-8']:
+                                try:
+                                    decoded_content = content.decode(encoding, errors="ignore")
+                                    break
+                                except UnicodeDecodeError:
+                                    continue
+                            
+                            if decoded_content:
+                                pattern = re.compile(r'key-library-path.*?"([^"]+)"', re.DOTALL)
+                                m = pattern.search(decoded_content)
+                                if m:
+                                    preferences_path = m.group(1).replace("/", "\\")
+                                    if os.path.exists(preferences_path) and validate_otzaria_folder(preferences_path):
+                                        LOCAL_PATH = preferences_path
+                                        self.status.emit(f"נמצאה תיקיית אוצריא מקובץ ההגדרות של תוכנת אוצריא: {LOCAL_PATH}")
+                                        self.copy_manifests_and_finish()
+                                        return
+                        except Exception as file_error:
+                            self.status.emit(f"שגיאה בקריאת קובץ ההגדרות: {str(file_error)}")
+                else:
+                    self.status.emit("לא ניתן לגשת למשתנה APPDATA")
             except Exception as e:
-                self.status.emit(f"שגיאה בקריאת קובץ ההגדרות של תוכנת אוצריא.: {str(e)}")
+                self.status.emit(f"שגיאה בחיפוש בקובץ ההגדרות של תוכנת אוצריא: {str(e)}")
             
             if self.stop_search:
                 return
@@ -953,7 +983,9 @@ class WorkerThread(QThread):
             for drive in drives:
                 # בדיקת השהיה
                 while self.is_paused and not self.stop_search:
-                    self.status.emit("פעולה מושהית...")
+                    if not self.pause_message_sent:
+                        self.status.emit("פעולה מושהית...")
+                        self.pause_message_sent = True
                     time.sleep(0.5)
                 
                 if self.stop_search:
@@ -973,30 +1005,49 @@ class WorkerThread(QThread):
                 return
             
             # שלב 4: חיפוש בכל המחשב + אפשרות בחירה ידנית
-            self.status.emit("מחפש בכל המחשב... (ניתן לבחור ידנית)")
+            self.status.emit("מחפש בכל המחשב... לחץ על 'בחר תיקיה ידנית' כדי לעצור את החיפוש ולבחור בעצמך")
             self.progress.emit(60)
             
             # שליחת signal לאפשרות בחירה ידנית
             self.manual_selection.emit()
             
-            # המשך חיפוש בכל המחשב
+            # המתנה קצרה לאפשר למשתמש לבחור ידנית
+            time.sleep(2)
+            
+            # בדיקה אם נעשתה בחירה ידנית
+            if self.manual_selected or self.stop_search:
+                return
+            
+            # המשך חיפוש בכל המחשב רק אם לא נעשתה בחירה ידנית
             for drive in drives:
+                # בדיקת בחירה ידנית או עצירה
+                if self.manual_selected or self.stop_search:
+                    return
+                    
                 # בדיקת השהיה
                 while self.is_paused and not self.stop_search:
-                    self.status.emit("פעולה מושהית...")
+                    if not self.pause_message_sent:
+                        self.status.emit("פעולה מושהית...")
+                        self.pause_message_sent = True
                     time.sleep(0.5)
                 
-                if self.stop_search:
+                if self.stop_search or self.manual_selected:
                     return
+                    
                 self.status.emit(f"מחפש בכל קבצי כונן {drive}")
                 try:
                     for root, dirs, files in os.walk(drive):
-                        # בדיקת השהיה בלולאה הפנימית
+                        # בדיקת בחירה ידנית או השהיה בלולאה הפנימית
+                        if self.manual_selected or self.stop_search:
+                            return
+                            
                         while self.is_paused and not self.stop_search:
-                            self.status.emit("פעולה מושהית...")
+                            if not self.pause_message_sent:
+                                self.status.emit("פעולה מושהית...")
+                                self.pause_message_sent = True
                             time.sleep(0.5)
                         
-                        if self.stop_search:
+                        if self.stop_search or self.manual_selected:
                             return
                         if "אוצריא" in dirs:
                             potential_path = os.path.join(root, "אוצריא")
@@ -1242,7 +1293,9 @@ class WorkerThread(QThread):
                     for future in concurrent.futures.as_completed(future_to_task):
                         # בדיקת השהיה
                         while self.is_paused and not self.stop_search:
-                            self.status.emit("פעולה מושהית...")
+                            if not self.pause_message_sent:
+                                self.status.emit("פעולה מושהית...")
+                                self.pause_message_sent = True
                             time.sleep(0.5)
                         
                         # בדיקת ביטול
@@ -1346,7 +1399,9 @@ class WorkerThread(QThread):
         try:
             # בדיקת השהיה לפני העתקת קבצים
             while self.is_paused and not self.stop_search:
-                self.status.emit("פעולה מושהית...")
+                if not self.pause_message_sent:
+                    self.status.emit("פעולה מושהית...")
+                    self.pause_message_sent = True
                 time.sleep(0.5)
             
             if self.stop_search:
@@ -1369,7 +1424,9 @@ class WorkerThread(QThread):
             
             # בדיקת השהיה לפני מחיקת קבצים
             while self.is_paused and not self.stop_search:
-                self.status.emit("פעולה מושהית...")
+                if not self.pause_message_sent:
+                    self.status.emit("פעולה מושהית...")
+                    self.pause_message_sent = True
                 time.sleep(0.5)
             
             if self.stop_search:
@@ -1386,7 +1443,9 @@ class WorkerThread(QThread):
                 for file_path in content:
                     # בדיקת השהיה בכל קובץ
                     while self.is_paused and not self.stop_search:
-                        self.status.emit("פעולה מושהית...")
+                        if not self.pause_message_sent:
+                            self.status.emit("פעולה מושהית...")
+                            self.pause_message_sent = True
                         time.sleep(0.5)
                     
                     if self.stop_search:
@@ -1408,7 +1467,9 @@ class WorkerThread(QThread):
             
             # בדיקת השהיה לפני מחיקת תיקיות רקות
             while self.is_paused and not self.stop_search:
-                self.status.emit("פעולה מושהית...")
+                if not self.pause_message_sent:
+                    self.status.emit("פעולה מושהית...")
+                    self.pause_message_sent = True
                 time.sleep(0.5)
             
             if self.stop_search:
@@ -1420,7 +1481,9 @@ class WorkerThread(QThread):
                 for dir_name in dirs:
                     # בדיקת השהיה בכל תיקיה
                     while self.is_paused and not self.stop_search:
-                        self.status.emit("פעולה מושהית...")
+                        if not self.pause_message_sent:
+                            self.status.emit("פעולה מושהית...")
+                            self.pause_message_sent = True
                         time.sleep(0.5)
                     
                     if self.stop_search:
@@ -1511,8 +1574,12 @@ class AnimatedButton(QPushButton):
         self.disabled_style = disabled or original
         self.pressed_style = pressed or hover
         
-        # הגדרת הסגנון הנוכחי בהתאם למצב הכפתור
-        self.setStyleSheet(original)
+        # הגדרת הסגנון הנוכחי עם כל המצבים כולל pressed
+        combined_style = original + hover
+        # אם יש סגנון pressed נפרד, נוסיף אותו
+        if pressed and pressed != hover:
+            combined_style += pressed
+        self.setStyleSheet(combined_style)
         
         # עדכון אפקט השקיפות בהתאם למצב הכפתור
         self._update_opacity_effect()
@@ -1640,7 +1707,7 @@ class AnimatedButton(QPushButton):
             super().enterEvent(event)
     
     def leaveEvent(self, event):
-        """אירוع יציאה של העכבר"""
+        """אירוע יציאה של העכבר"""
         try:
             # אם הכפתור לא פעיל - לא לעשות כלום
             if not self.isEnabled():
@@ -2060,6 +2127,9 @@ class ThemeManager:
             # עדכון כל הכפתורים
             self._update_buttons_theme(widget, theme)
             
+            # עדכון כפתורי שליטה על היומן
+            self._update_log_control_buttons_theme(theme)
+            
             # עדכון מדי התקדמות
             self._update_progress_bars_theme(widget, theme)
             
@@ -2178,6 +2248,40 @@ class ThemeManager:
         except Exception as e:
             print(f"שגיאה בעדכון כפתור מונפש: {e}")
     
+    def _update_log_control_buttons_theme(self, theme):
+        """עדכון כפתורי שליטה על יומן הפעולות לערכת נושא"""
+        try:
+            if hasattr(self, 'btn_expand_log') and hasattr(self, 'btn_shrink_log'):
+                if theme == "dark":
+                    style = """
+                        QPushButton {
+                            background-color: #424242;
+                            border: 1px solid #616161;
+                            border-radius: 3px;
+                            color: white;
+                            font-size: 12px;
+                        }
+                        QPushButton:hover {
+                            background-color: #616161;
+                        }
+                    """
+                else:
+                    style = """
+                        QPushButton {
+                            background-color: #E3F2FD;
+                            border: 1px solid #BBDEFB;
+                            border-radius: 3px;
+                            font-size: 12px;
+                        }
+                        QPushButton:hover {
+                            background-color: #BBDEFB;
+                        }
+                    """
+                self.btn_expand_log.setStyleSheet(style)
+                self.btn_shrink_log.setStyleSheet(style)
+        except Exception as e:
+            print(f"שגיאה בעדכון כפתורי שליטה על היומן: {e}")
+    
     def _update_regular_button_theme(self, button, theme):
         """עדכון כפתור רגיל לערכת נושא"""
         try:
@@ -2200,7 +2304,9 @@ class ThemeManager:
                         background-color: #7B1FA2;
                     }
                     QPushButton:disabled {
-                        opacity: 0.6;
+                        opacity: 0.4;
+                        background-color: #CCCCCC;
+                        color: #888888;
                     }
                 """
             elif button_text == "בטל":
@@ -2726,6 +2832,10 @@ class ShortcutManager:
             self.add_shortcut("Ctrl+E", self._export_stats, "ייצוא סטטיסטיקות")
             self.add_shortcut("Escape", self._cancel_operation, "ביטול פעולה נוכחית")
             
+            # קיצורי מקלדת לשליטה על איזור היומן
+            self.add_shortcut("Ctrl+Up", self._expand_log, "הגדלת איזור יומן הפעולות")
+            self.add_shortcut("Ctrl+Down", self._shrink_log, "הקטנת איזור יומן הפעולות")
+            
             return True
             
         except Exception as e:
@@ -2884,6 +2994,22 @@ class ShortcutManager:
         except Exception as e:
             print(f"שגיאה בביטול פעולה: {e}")
     
+    def _expand_log(self):
+        """הגדלת איזור יומן הפעולות"""
+        try:
+            if hasattr(self.main_window, 'expand_log_area'):
+                self.main_window.expand_log_area()
+        except Exception as e:
+            print(f"שגיאה בהגדלת איזור היומן: {e}")
+    
+    def _shrink_log(self):
+        """הקטנת איזור יומן הפעולות"""
+        try:
+            if hasattr(self.main_window, 'shrink_log_area'):
+                self.main_window.shrink_log_area()
+        except Exception as e:
+            print(f"שגיאה בהקטנת איזור היומן: {e}")
+    
     def _show_help(self):
         """הצגת דיאלוג עזרה"""
         self.show_help_dialog()
@@ -2912,7 +3038,7 @@ class ShortcutManager:
                 "פעולות בסיסיות": ["Ctrl+S", "Ctrl+P", "Ctrl+Q", "Ctrl+O", "Escape"],
                 "ערכת נושא וגופן": ["Ctrl+D", "Ctrl++", "Ctrl+-", "Ctrl+0"],
                 "ניווט": ["Ctrl+1", "Ctrl+2", "Ctrl+3"],
-                "פעולות מתקדמות": ["Ctrl+R", "Ctrl+E"],
+                "פעולות מתקדמות": ["Ctrl+R", "Ctrl+E", "Ctrl+Up", "Ctrl+Down"],
                 "עזרה": ["F1", "Ctrl+I"]
             }
             
@@ -3081,9 +3207,9 @@ class OtzariaSync(QMainWindow):
         buttons_layout.setContentsMargins(12, 12, 12, 12)  # הקטנה נוספת
         
         # כפתורים משופרים עם אייקונים
-        self.btn_load_manifests = AnimatedButton("טען קבצי נתוני ספרים")
-        # self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24))
-        # self.btn_load_manifests.setIconSize(QSize(24, 24))
+        self.btn_load_manifests = AnimatedButton("   טען קבצי נתוני ספרים")
+        self.btn_load_manifests.setIcon(self.icon_manager.get_icon('folder', size=24))
+        self.btn_load_manifests.setIconSize(QSize(24, 24))
         self.btn_load_manifests.setToolTip("מחפש את תיקיית אוצריא במחשב, וטוען את קבצי המניפסט מתיקיית התוכנה\nקיצור מקלדת: Ctrl+S")
         self.btn_load_manifests.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_load_manifests.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -3114,9 +3240,9 @@ class OtzariaSync(QMainWindow):
         self.btn_load_manifests.clicked.connect(self.load_manifests)
         
         # כפתור 2
-        self.btn_download_updates = AnimatedButton("הורד קבצים חדשים וקבצים שהתעדכנו")
-        # self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24))
-        # self.btn_download_updates.setIconSize(QSize(24, 24))
+        self.btn_download_updates = AnimatedButton("   הורד קבצים חדשים וקבצים שהתעדכנו")
+        self.btn_download_updates.setIcon(self.icon_manager.get_icon('download', size=24))
+        self.btn_download_updates.setIconSize(QSize(24, 24))
         self.btn_download_updates.setToolTip("מוריד קבצים חדשים ומעודכנים מהשרת\nזמין רק לאחר טעינת קבצי הנתונים")
         self.btn_download_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_download_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -3148,9 +3274,9 @@ class OtzariaSync(QMainWindow):
         self.btn_download_updates.setEnabled(False)
         
         # כפתור 3
-        self.btn_apply_updates = AnimatedButton("עדכן שינויים לתוך מאגר הספרים")
-        # self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24))
-        # self.btn_apply_updates.setIconSize(QSize(24, 24))
+        self.btn_apply_updates = AnimatedButton("   עדכן שינויים לתוך מאגר הספרים")
+        self.btn_apply_updates.setIcon(self.icon_manager.get_icon('sync', size=24))
+        self.btn_apply_updates.setIconSize(QSize(24, 24))
         self.btn_apply_updates.setToolTip("מעתיק את הקבצים החדשים לתיקיית אוצריא\nזמין רק לאחר הורדת העדכונים")
         self.btn_apply_updates.setMinimumHeight(50)  # הקטנה מ-60 ל-50
         self.btn_apply_updates.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -3184,64 +3310,114 @@ class OtzariaSync(QMainWindow):
         # כפתורי בקרה
         control_layout = QHBoxLayout()
         
-        self.btn_pause = QPushButton("השהה")
-        # self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
-        # self.btn_pause.setIconSize(QSize(16, 16))
+        self.btn_pause = AnimatedButton("   השהה")
+        self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
+        self.btn_pause.setIconSize(QSize(16, 16))
         self.btn_pause.setToolTip("השהה או המשך את התהליך הנוכחי\nקיצור מקלדת: Ctrl+P")
         self.btn_pause.setMinimumHeight(40)
-        self.btn_pause.setStyleSheet("""
+        pause_original_style = """
             QPushButton {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                font-size: 12px;
+                background-color: #FF9800 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 5px !important;
+                font-size: 12px !important;
             }
-            QPushButton:hover {
-                background-color: #F57C00;
+            QPushButton:pressed {
+                background-color: #E65100 !important;
+                border-radius: 5px !important;
             }
-        """)
+        """
+        pause_hover_style = """
+            QPushButton:hover:enabled {
+                background-color: #F57C00 !important;
+                border-radius: 5px !important;
+            }
+        """
+        self.btn_pause.set_styles(pause_original_style, pause_hover_style)
+        self.btn_pause.set_disabled_opacity(0.5)  # שקיפות בינונית
         self.btn_pause.clicked.connect(self.toggle_pause)
         self.btn_pause.setEnabled(False)
         
-        self.btn_cancel = QPushButton("בטל")
-        # self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16))
-        # self.btn_cancel.setIconSize(QSize(16, 16))
+        self.btn_cancel = AnimatedButton("   בטל")
+        self.btn_cancel.setIcon(self.icon_manager.get_icon('stop', size=16))
+        self.btn_cancel.setIconSize(QSize(16, 16))
         self.btn_cancel.setToolTip("בטל את התהליך הנוכחי\nקיצור מקלדת: Escape")
         self.btn_cancel.setMinimumHeight(40)
-        self.btn_cancel.setStyleSheet("""
+        cancel_complete_style = """
             QPushButton {
-                background-color: #f44336;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                font-size: 12px;
+                background-color: #f44336 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 5px !important;
+                font-size: 12px !important;
             }
-            QPushButton:hover {
-                background-color: #da190b;
+            QPushButton:hover:enabled {
+                background-color: #da190b !important;
+                border-radius: 5px !important;
             }
-        """)
+            QPushButton:pressed {
+                background-color: #c62828 !important;
+                border-radius: 5px !important;
+            }
+        """
+        self.btn_cancel.set_disabled_opacity(0.5)  # שקיפות בינונית
+        # החלה מיידית של הסגנון המלא
+        self.btn_cancel.setStyleSheet(cancel_complete_style)
         self.btn_cancel.clicked.connect(self.cancel_operation)
         self.btn_cancel.setEnabled(False)
 
-        self.btn_reset_data = QPushButton("איפוס מצב")
-        # self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16))
-        # self.btn_reset_data.setIconSize(QSize(16, 16))
+        self.btn_reset_data = AnimatedButton("   איפוס מצב")
+        self.btn_reset_data.setIcon(self.icon_manager.get_icon('refresh', size=16))
+        self.btn_reset_data.setIconSize(QSize(16, 16))
         self.btn_reset_data.setToolTip("מאפס את מצב ההתקדמות ומתחיל מחדש\nקיצור מקלדת: Ctrl+R")
         self.btn_reset_data.setMinimumHeight(40)
-        self.btn_reset_data.setStyleSheet("""
+        reset_complete_style = """
             QPushButton {
-                background-color: #9C27B0;
+                background-color: #9C27B0 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 5px !important;
+                font-size: 12px !important;
+            }
+            QPushButton:hover:enabled {
+                background-color: #7B1FA2 !important;
+                border-radius: 5px !important;
+            }
+            QPushButton:pressed {
+                background-color: #6A1B9A !important;
+                border-radius: 5px !important;
+            }
+        """
+        self.btn_reset_data.set_disabled_opacity(0.5)  # שקיפות בינונית
+        self.btn_reset_data.clicked.connect(self.reset_data)
+        self.btn_reset_data.setEnabled(False)  # שיפור UX: לא פעיל בפתיחת התוכנה, רק אחרי שלב ראשון
+        
+        # החלת הסגנון המלא מיד
+        self.btn_reset_data.setStyleSheet(reset_complete_style)
+
+        # שיפורי UX שבוצעו:
+        # 1. כפתורי 'השהה' ו'בטל' פעילים רק במהלך פעולות
+        # 2. כפתור 'איפוס מצב' פעיל רק אחרי שלב ראשון
+        # 3. איזור יומן הפעולות ניתן להגדלה/הקטנה עם כפתורים וקיצורי מקלדת
+
+        # כפתור בחירה ידנית
+        self.btn_manual_select = QPushButton("📁 בחר תיקיה ידנית")
+        self.btn_manual_select.setMinimumHeight(40)
+        self.btn_manual_select.setStyleSheet("""
+            QPushButton {
+                border-radius: 8px;
+                background-color: #607D8B;
                 color: white;
-                border: none;
-                border-radius: 5px;
+                font-weight: bold;
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #7B1FA2;
+                background-color: #546E7A;
             }
         """)
-        self.btn_reset_data.clicked.connect(self.reset_data)
+        self.btn_manual_select.clicked.connect(self.show_manual_selection)
+        self.btn_manual_select.setVisible(False)  # מוסתר בהתחלה
 
         # Progress bar משופר
         self.progress_bar = EnhancedProgressBar()
@@ -3282,9 +3458,10 @@ class OtzariaSync(QMainWindow):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("color: #2E4057; font-weight: bold;")
         
-        # Log text area
+        # Log text area with resizable functionality
         self.log_text = QTextEdit()
-        self.log_text.setMaximumHeight(120)  # הקטנה מ-150 ל-120
+        self.log_text.setMinimumHeight(80)   # גובה מינימלי
+        self.log_text.setMaximumHeight(300)  # גובה מקסימלי מוגדל
         self.log_text.setReadOnly(True)
         self.log_text.setStyleSheet("""
             QTextEdit {
@@ -3301,7 +3478,12 @@ class OtzariaSync(QMainWindow):
         sync_layout.addWidget(subtitle_label)
         sync_layout.addWidget(self.status_label)
         
-        buttons_layout.addWidget(self.btn_load_manifests)
+        # שורה ראשונה - כפתור טעינת מניפסטים וכפתור בחירה ידנית
+        first_row_layout = QHBoxLayout()
+        first_row_layout.addWidget(self.btn_load_manifests)
+        first_row_layout.addWidget(self.btn_manual_select)
+        buttons_layout.addLayout(first_row_layout)
+        
         buttons_layout.addWidget(self.btn_download_updates)
         buttons_layout.addWidget(self.btn_apply_updates)
         buttons_frame.setLayout(buttons_layout)
@@ -3315,10 +3497,52 @@ class OtzariaSync(QMainWindow):
         control_layout.addWidget(self.btn_reset_data)
         buttons_layout.addLayout(control_layout)
         
-        # יומן פעולות
+        # יומן פעולות עם כפתורי שליטה - שיפור UI לאפשר הגדלה/הקטנה של איזור היומן
+        log_header_layout = QHBoxLayout()
         log_label = QLabel("יומן פעולות:")
         log_label.setStyleSheet("margin-bottom: 5px; margin-top: 10px; font-weight: bold; font-size: 14px;")
-        sync_layout.addWidget(log_label)
+        
+        # כפתורי שליטה על גודל יומן הפעולות
+        self.btn_expand_log = QPushButton("▲")
+        self.btn_expand_log.setMaximumWidth(30)
+        self.btn_expand_log.setMaximumHeight(25)
+        self.btn_expand_log.setToolTip("הגדל את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+Up")
+        self.btn_expand_log.setStyleSheet("""
+            QPushButton {
+                background-color: #E3F2FD;
+                border: 1px solid #BBDEFB;
+                border-radius: 3px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #BBDEFB;
+            }
+        """)
+        self.btn_expand_log.clicked.connect(self.expand_log_area)
+        
+        self.btn_shrink_log = QPushButton("▼")
+        self.btn_shrink_log.setMaximumWidth(30)
+        self.btn_shrink_log.setMaximumHeight(25)
+        self.btn_shrink_log.setToolTip("הקטן את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+Down")
+        self.btn_shrink_log.setStyleSheet("""
+            QPushButton {
+                background-color: #E3F2FD;
+                border: 1px solid #BBDEFB;
+                border-radius: 3px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #BBDEFB;
+            }
+        """)
+        self.btn_shrink_log.clicked.connect(self.shrink_log_area)
+        
+        log_header_layout.addWidget(log_label)
+        log_header_layout.addStretch()
+        log_header_layout.addWidget(self.btn_shrink_log)
+        log_header_layout.addWidget(self.btn_expand_log)
+        
+        sync_layout.addLayout(log_header_layout)
         sync_layout.addWidget(self.log_text)
         
         sync_tab.setLayout(sync_layout)
@@ -3469,6 +3693,8 @@ class OtzariaSync(QMainWindow):
         Ctrl+R - איפוס מצב
         Ctrl++ - הגדל גופן
         Ctrl+- - הקטן גופן
+        Ctrl+Up - הגדל איזור יומן הפעולות
+        Ctrl+Down - הקטן איזור יומן הפעולות
         Space - השהה/המשך
         Escape - בטל פעולה
         """
@@ -3744,9 +3970,14 @@ class OtzariaSync(QMainWindow):
             
             print("הגדרות ראשוניות הוחלו בהצלחה")
             
+            # החלת סגנונות כפתורים אחרי שכל הנושא נטען
+            QTimer.singleShot(200, lambda: self._apply_all_button_styles())
+            
         except Exception as e:
             print(f"שגיאה בהחלת הגדרות ראשוניות: {e}")
             self.apply_theme_fallback()
+            # החלת סגנונות כפתורים גם במקרה של שגיאה
+            QTimer.singleShot(200, lambda: self._apply_all_button_styles())
     
     def refresh_theme(self):
         """רענון ערכת נושא - לשימוש לאחר תיקונים"""
@@ -4147,6 +4378,11 @@ class OtzariaSync(QMainWindow):
         if current_step >= 0:
             self.btn_load_manifests.setEnabled(True)
         if current_step >= 1:
+            # הפעלת כפתור איפוס מצב רק אחרי שהושלם שלב ראשון
+            self.btn_reset_data.setEnabled(True)
+            # החלת הסגנון הסגול מחדש
+            self._apply_reset_button_style()
+            self.log("כפתור איפוס המצב הופעל לאחר השלמת שלב 1")
             self.btn_download_updates.setEnabled(True)
         if current_step >= 2:
             self.btn_apply_updates.setEnabled(True)
@@ -4159,6 +4395,7 @@ class OtzariaSync(QMainWindow):
             self.btn_apply_updates.setEnabled(False)
 
     def reset_state(self):
+        self._apply_reset_button_style()
         """איפוס מצב התקדמות עם דיאלוג אישור"""
         reply = QMessageBox.question(self, "איפוס מצב", 
                                 "האם אתה בטוח שברצונך לאפס את מצב ההתקדמות?\n\nפעולה זו תמחק את כל ההתקדמות השמורה ותחזיר אותך לשלב הראשון.",
@@ -4174,12 +4411,23 @@ class OtzariaSync(QMainWindow):
                 
                 # עדכון UI למצב התחלתי
                 self.load_and_set_state()
+                # איפוס סרגל התקדמות
+                self.progress_bar.setValue(0)
+                self.progress_bar.setVisible(False)
+                # איפוס הודעת סטטוס
+                self.status_label.setText("מוכן להתחלה")
+                # השבתת כפתור איפוס מצב אחרי איפוס
+                self.btn_reset_data.setEnabled(False)
+                # החלת הסגנון הסגול מחדש גם כשהכפתור לא פעיל
+                QTimer.singleShot(100, lambda: self._apply_reset_button_style())
                 QMessageBox.information(self, "איפוס הושלם", "מצב ההתקדמות אופס בהצלחה!")
             else:
                 QMessageBox.warning(self, "שגיאה", "שגיאה באיפוס מצב ההתקדמות")
 
     def reset_data(self):
         """איפוס נתוני המצב השמורים - אותה פונקציה כמו reset_state"""
+        # החלת הסגנון הסגול מיד אחרי הלחיצה
+        self._apply_reset_button_style()
         self.reset_state()
     
     def update_memory_info(self, memory_info):
@@ -4321,6 +4569,8 @@ class OtzariaSync(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.btn_load_manifests.setEnabled(False)
+        self.btn_manual_select.setVisible(False)  # הסתרת כפתור הבחירה הידנית
+        self.disable_reset_during_operation()  # השבתת כפתור איפוס מצב במהלך פעולה
         
         # עדכון הודעות סטטוס
         self.status_label.setText("מתחיל טעינת קבצי נתונים...")
@@ -4334,23 +4584,33 @@ class OtzariaSync(QMainWindow):
         self.worker.status.connect(self.status_label.setText)
         self.worker.status.connect(self.log)
         self.worker.finished.connect(self.on_load_manifests_finished)
-        self.worker.manual_selection.connect(self.show_manual_selection)  # חיבור חדש
+        self.worker.manual_selection.connect(self.show_manual_selection_button)  # חיבור חדש
         # חיבור למידע זיכרון אם קיים
         if hasattr(self.worker, 'memory_info'):
             self.worker.memory_info.connect(self.update_memory_info)
         self.worker.start()
-        self.btn_pause.setEnabled(True)
-        self.btn_cancel.setEnabled(True)
+        self.enable_operation_buttons()
         
+    def show_manual_selection_button(self):
+        """הצגת כפתור הבחירה הידנית"""
+        self.btn_manual_select.setVisible(True)
+    
     def show_manual_selection(self):
         """הצגת חלון בחירת תיקיה ידנית"""
         folder = QFileDialog.getExistingDirectory(self, "בחר את תיקיית אוצריא")
         if folder:
             global LOCAL_PATH
             LOCAL_PATH = folder
-            # עצירת החיפוש הנוכחי והתחלת חיפוש חדש
+            # עצירת החיפוש הנוכחי מיידית
             if self.worker:
                 self.worker.stop_search = True
+                self.worker.manual_selected = True  # סימון שנעשתה בחירה ידנית
+                # המתנה קצרה לוודא שהחיפוש נעצר
+                self.worker.wait(1000)  # המתנה של שנייה אחת
+            # הסתרת הכפתור אחרי הבחירה
+            self.btn_manual_select.setVisible(False)
+            # הודעה למשתמש
+            self.log(f"נבחרה תיקיה ידנית: {folder}")
             self.load_manifests()
         else:
             QMessageBox.warning(self, "שגיאה", "לא נבחרה תיקיה")
@@ -4359,10 +4619,20 @@ class OtzariaSync(QMainWindow):
     def on_load_manifests_finished(self, success, message):
         self.progress_bar.setVisible(False)
         self.status_label.setText(message)
+        
+        # השבתת כפתורי השהיה וביטול בסיום הפעולה
+        self.disable_operation_buttons()
         self.log(message)
         self.reset_buttons()
         
         if success:
+            # סגירה אוטומטית של כפתור בחירה ידנית אם מוצג
+            if self.btn_manual_select.isVisible():
+                self.btn_manual_select.setVisible(False)
+                self.log("כפתור הבחירה הידנית הוסתר אוטומטית לאחר מציאת המניפסטים")
+            else:
+                self.log("כפתור הבחירה הידנית כבר היה מוסתר")
+            
             # אנימציה למעבר לשלב הבא
             self.animate_step_transition(1)
             
@@ -4376,6 +4646,8 @@ class OtzariaSync(QMainWindow):
             self.settings.setValue("last_sync", datetime.now().isoformat())
             
             self.btn_download_updates.setEnabled(True)
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב אחרי השלב הראשון
+            self._apply_reset_button_style()
             self.log("שלב 1 הושלם - קבצי המניפסט נטענו")
             
             # עדכון סטטיסטיקות
@@ -4384,6 +4656,8 @@ class OtzariaSync(QMainWindow):
             QMessageBox.information(self, "הצלחה", message)
         else:
             self.btn_load_manifests.setEnabled(True)
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב גם במקרה של שגיאה
+            self._apply_reset_button_style()
             # שמירת מצב גם במקרה של שגיאה כדי לאפשר המשך
             state_data = {"step": 0, "error": message}
             self.save_sync_state(state_data)
@@ -4396,6 +4670,7 @@ class OtzariaSync(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.btn_download_updates.setEnabled(False)
+        self.disable_reset_during_operation()  # השבתת כפתור איפוס מצב במהלך פעולה
         
         # עדכון הודעות סטטוס
         self.status_label.setText("מתחיל הורדת עדכונים...")
@@ -4413,11 +4688,13 @@ class OtzariaSync(QMainWindow):
         if hasattr(self.worker, 'memory_info'):
             self.worker.memory_info.connect(self.update_memory_info)
         self.worker.start()
-        self.btn_pause.setEnabled(True)
-        self.btn_cancel.setEnabled(True)
+        self.enable_operation_buttons()
         
     def on_download_updates_finished(self, success, message):
         self.progress_bar.setVisible(False)
+        
+        # השבתת כפתורי השהיה וביטול בסיום הפעולה
+        self.disable_operation_buttons()
         
         # בדיקה אם אין קבצים חדשים
         no_files_to_download = message.endswith("|NO_FILES")
@@ -4457,6 +4734,8 @@ class OtzariaSync(QMainWindow):
                 self.settings.setValue("last_sync", datetime.now().isoformat())
                 
                 self.btn_apply_updates.setEnabled(True)
+                self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב אחרי השלב השני
+                self._apply_reset_button_style()
                 self.log("שלב 2 הושלם - עדכונים הורדו")
                 
                 # עדכון סטטיסטיקות
@@ -4465,6 +4744,8 @@ class OtzariaSync(QMainWindow):
                 QMessageBox.information(self, "הצלחה", message)
         else:
             self.btn_download_updates.setEnabled(True)
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב גם במקרה של שגיאה
+            self._apply_reset_button_style()
             # שמירת מצב גם במקרה של שגיאה
             state_data = {
                 "step": 1,
@@ -4483,6 +4764,7 @@ class OtzariaSync(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.btn_apply_updates.setEnabled(False)
+        self.disable_reset_during_operation()  # השבתת כפתור איפוס מצב במהלך פעולה
         
         # עדכון הודעות סטטוס
         self.status_label.setText("מתחיל החלת עדכונים...")
@@ -4500,12 +4782,14 @@ class OtzariaSync(QMainWindow):
         if hasattr(self.worker, 'memory_info'):
             self.worker.memory_info.connect(self.update_memory_info)
         self.worker.start()
-        self.btn_pause.setEnabled(True)
-        self.btn_cancel.setEnabled(True)
+        self.enable_operation_buttons()
     
     def on_apply_updates_finished(self, success, message):
         self.progress_bar.setVisible(False)
         self.status_label.setText(message)
+        
+        # השבתת כפתורי השהיה וביטול בסיום הפעולה
+        self.disable_operation_buttons()
         self.log(message)
         self.reset_buttons()
         
@@ -4529,6 +4813,8 @@ class OtzariaSync(QMainWindow):
             self.btn_load_manifests.setEnabled(True)
             self.btn_download_updates.setEnabled(False)
             self.btn_apply_updates.setEnabled(False)
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב אחרי השלב השלישי
+            self._apply_reset_button_style()
             
             # עדכון סטטיסטיקות סופי
             self.update_stats_display()
@@ -4553,6 +4839,8 @@ class OtzariaSync(QMainWindow):
             
         else:
             self.btn_apply_updates.setEnabled(True)
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב גם במקרה של שגיאה
+            self._apply_reset_button_style()
             # שמירת מצב שגיאה
             state_data = {
                 "step": 2,
@@ -4572,37 +4860,19 @@ class OtzariaSync(QMainWindow):
             self.worker.is_paused = self.is_paused
             
             if self.is_paused:
-                self.btn_pause.setText("המשך")
-                # self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16))
-                self.btn_pause.setStyleSheet("""
-                    QPushButton {
-                        background-color: #4CAF50;
-                        color: white;
-                        border: none;
-                        border-radius: 5px;
-                        font-size: 12px;
-                    }
-                    QPushButton:hover {
-                        background-color: #45a049;
-                    }
-                """)
+                # איפוס דגל הודעת השהיה
+                self.worker.pause_message_sent = False
+                self.btn_pause.setText("   המשך")
+                self.btn_pause.setIcon(self.icon_manager.get_icon('play', size=16))
+                self.set_pause_button_style("resume")
                 self.status_label.setText("פעולה מושהית")
                 self.log("פעולה הושהתה")  # רישום פעם אחת בלבד
             else:
+                # איפוס דגל הודעת השהיה כשממשיכים
+                self.worker.pause_message_sent = False
                 self.btn_pause.setText("השהה")
                 # self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
-                self.btn_pause.setStyleSheet("""
-                    QPushButton {
-                        background-color: #FF9800;
-                        color: white;
-                        border: none;
-                        border-radius: 5px;
-                        font-size: 12px;
-                    }
-                    QPushButton:hover {
-                        background-color: #F57C00;
-                    }
-                """)
+                self.set_pause_button_style("pause")
                 self.status_label.setText("פעולה מתבצעת")
                 self.log("פעולה הומשכה")  # רישום פעם אחת בלבד
     
@@ -4616,24 +4886,207 @@ class OtzariaSync(QMainWindow):
             self.status_label.setText("פעולה בוטלה")
             self.log("פעולה בוטלה על ידי המשתמש")
             self.reset_buttons()
+            self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב אחרי ביטול
+            # החלת הסגנונות מחדש על כל הכפתורים
+            QTimer.singleShot(50, lambda: self._apply_all_button_styles())
             
     def reset_buttons(self):
+        """איפוס מצב כל הכפתורים"""
         self.btn_pause.setEnabled(False)
         self.btn_cancel.setEnabled(False)
+        self.btn_manual_select.setVisible(False)
         self.btn_pause.setText("השהה")
-        # איפוס עיצוב כפתור השהיה למצב הרגיל
-        self.btn_pause.setStyleSheet("""
+        self.set_pause_button_style("pause")  # איפוס לסגנון השהיה
+        # החלת הסגנונות מחדש
+        QTimer.singleShot(20, lambda: self._apply_all_button_styles())
+    
+    def enable_operation_buttons(self):
+        """הפעלת כפתורי השהיה וביטול במהלך פעולה - שיפור UX"""
+        self.btn_pause.setEnabled(True)
+        self.btn_cancel.setEnabled(True)
+    
+    def disable_operation_buttons(self):
+        """השבתת כפתורי השהיה וביטול בסיום פעולה - שיפור UX"""
+        self.btn_pause.setEnabled(False)
+        self.btn_cancel.setEnabled(False)
+    
+    def disable_reset_during_operation(self):
+        """השבתת כפתור איפוס מצב במהלך פעולה"""
+        self.btn_reset_data.setEnabled(False)
+    
+    def enable_reset_after_operation(self):
+        """הפעלת כפתור איפוס מצב אחרי פעולה"""
+        self.btn_reset_data.setEnabled(True)
+        # החלת הסגנון הסגול מחדש
+        self._apply_reset_button_style()
+    
+    def _apply_reset_button_style(self):
+        """החלת הסגנון הסגול על כפתור איפוס המצב"""
+        reset_complete_style = """
             QPushButton {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                font-size: 12px;
+                background-color: #9C27B0 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 5px !important;
+                font-size: 12px !important;
             }
-            QPushButton:hover {
-                background-color: #F57C00;
+            QPushButton:hover:enabled {
+                background-color: #7B1FA2 !important;
+                border-radius: 5px !important;
             }
-        """)
+            QPushButton:pressed {
+                background-color: #6A1B9A !important;
+                border-radius: 5px !important;
+            }
+        """
+        # החלה מיידית של הסגנון המלא
+        self.btn_reset_data.setStyleSheet(reset_complete_style)
+    
+    def set_pause_button_style(self, style_type="pause"):
+        """הגדרת סגנון כפתור ההשהיה"""
+        if style_type == "pause":
+            # סגנון השהיה (כתום) - סגנון מלא עם כל המצבים
+            complete_style = """
+                QPushButton {
+                    background-color: #FF9800 !important;
+                    color: white !important;
+                    border: none !important;
+                    border-radius: 5px !important;
+                    font-size: 12px !important;
+                }
+                QPushButton:hover:enabled {
+                    background-color: #F57C00 !important;
+                    border-radius: 5px !important;
+                }
+                QPushButton:pressed {
+                    background-color: #E65100 !important;
+                    border-radius: 5px !important;
+                }
+            """
+        else:  # style_type == "resume"
+            # סגנון המשך (ירוק) - סגנון מלא עם כל המצבים
+            complete_style = """
+                QPushButton {
+                    background-color: #4CAF50 !important;
+                    color: white !important;
+                    border: none !important;
+                    border-radius: 5px !important;
+                    font-size: 12px !important;
+                }
+                QPushButton:hover:enabled {
+                    background-color: #45a049 !important;
+                    border-radius: 5px !important;
+                }
+                QPushButton:pressed {
+                    background-color: #2E7D32 !important;
+                    border-radius: 5px !important;
+                }
+            """
+        
+        self.btn_pause.set_disabled_opacity(0.5)
+        # החלה מיידית של הסגנון המלא
+        self.btn_pause.setStyleSheet(complete_style)
+    
+    def _apply_pause_button_style_complete(self, style_type="pause"):
+        """החלת הסגנון המלא על כפתור ההשהיה"""
+        if style_type == "pause":
+            complete_style = """
+                QPushButton {
+                    background-color: #FF9800 !important;
+                    color: white !important;
+                    border: none !important;
+                    border-radius: 5px !important;
+                    font-size: 12px !important;
+                }
+                QPushButton:hover:enabled {
+                    background-color: #F57C00 !important;
+                    border-radius: 5px !important;
+                }
+                QPushButton:pressed {
+                    background-color: #E65100 !important;
+                    border-radius: 5px !important;
+                }
+            """
+        else:  # resume
+            complete_style = """
+                QPushButton {
+                    background-color: #4CAF50 !important;
+                    color: white !important;
+                    border: none !important;
+                    border-radius: 5px !important;
+                    font-size: 12px !important;
+                }
+                QPushButton:hover:enabled {
+                    background-color: #45a049 !important;
+                    border-radius: 5px !important;
+                }
+                QPushButton:pressed {
+                    background-color: #2E7D32 !important;
+                    border-radius: 5px !important;
+                }
+            """
+        self.btn_pause.setStyleSheet(complete_style)
+    
+    def _apply_cancel_button_style_complete(self):
+        """החלת הסגנון המלא על כפתור הביטול"""
+        complete_style = """
+            QPushButton {
+                background-color: #f44336 !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 5px !important;
+                font-size: 12px !important;
+            }
+            QPushButton:hover:enabled {
+                background-color: #da190b !important;
+                border-radius: 5px !important;
+            }
+            QPushButton:pressed {
+                background-color: #c62828 !important;
+                border-radius: 5px !important;
+            }
+        """
+        self.btn_cancel.setStyleSheet(complete_style)
+    
+    def _apply_all_button_styles(self):
+        """החלת הסגנונות על כל הכפתורים"""
+        self._apply_reset_button_style()
+        self.set_pause_button_style("pause")  # משתמש בפונקציה המעודכנת
+        self._apply_cancel_button_style_complete()
+    
+    def expand_log_area(self):
+        """הגדלת איזור יומן הפעולות"""
+        try:
+            current_height = self.log_text.height()
+            new_height = min(current_height + 50, 300)  # הגדלה של 50 פיקסלים עד למקסימום 300
+            if new_height != current_height:
+                self.log_text.setMinimumHeight(new_height)
+                self.log_text.setMaximumHeight(new_height)
+                # הודעה ליומן רק אם באמת השתנה הגודל
+                if new_height < 300:
+                    self.log(f"איזור יומן הפעולות הוגדל לגובה {new_height} פיקסלים")
+                else:
+                    self.log("איזור יומן הפעולות הגיע לגודל המקסימלי")
+        except Exception as e:
+            print(f"שגיאה בהגדלת איזור היומן: {e}")
+    
+    def shrink_log_area(self):
+        """הקטנת איזור יומן הפעולות"""
+        try:
+            current_height = self.log_text.height()
+            new_height = max(current_height - 50, 80)  # הקטנה של 50 פיקסלים עד למינימום 80
+            if new_height != current_height:
+                self.log_text.setMinimumHeight(new_height)
+                self.log_text.setMaximumHeight(new_height)
+                # הודעה ליומן רק אם באמת השתנה הגודל
+                if new_height > 80:
+                    self.log(f"איזור יומן הפעולות הוקטן לגובה {new_height} פיקסלים")
+                else:
+                    self.log("איזור יומן הפעולות הגיע לגודל המינימלי")
+        except Exception as e:
+            print(f"שגיאה בהקטנת איזור היומן: {e}")
+        # איפוס עיצוב כפתור השהיה למצב הרגיל
+        self.set_pause_button_style("pause")
         self.is_paused = False
         self.is_cancelled = False            
 
