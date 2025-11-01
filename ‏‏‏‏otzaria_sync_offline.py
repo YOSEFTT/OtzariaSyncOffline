@@ -6,9 +6,24 @@ import ctypes
 import shutil
 import requests
 import sys
+import psutil
 import gc
 import urllib3
+import concurrent.futures
+import threading
+import time
+import random
 from pathlib import Path
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+                           QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, 
+                           QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
+                           QGroupBox, QGridLayout, QSpacerItem, QSizePolicy, QMenuBar,
+                           QMenu, QStatusBar, QSplitter, QTabWidget, QScrollArea)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup, QSequentialAnimationGroup, pyqtProperty, QSettings, QPoint, QSize
+from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, QAction, QShortcut, QPainter
+from PyQt6.QtWidgets import QGraphicsOpacityEffect
+from urllib.parse import urljoin
+from datetime import datetime
 
 # ניסיון לייבא chardet עם fallback
 try:
@@ -65,22 +80,6 @@ def detect_file_encoding(file_path):
         
     except Exception:
         return 'utf-8'
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-                           QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, 
-                           QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
-                           QGroupBox, QGridLayout, QSpacerItem, QSizePolicy, QMenuBar,
-                           QMenu, QStatusBar, QSplitter, QTabWidget, QScrollArea)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup, QSequentialAnimationGroup, pyqtProperty, QSettings, QPoint, QSize
-from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, QAction, QShortcut, QPainter
-from PyQt6.QtWidgets import QGraphicsOpacityEffect
-import base64
-import concurrent.futures
-import threading
-from urllib.parse import urljoin
-import time
-import random
-from datetime import datetime
-import psutil
 
 BASE_URL = "https://raw.githubusercontent.com/Y-PLONI/otzaria-library/refs/heads/main/"
 BASE_PATH = "אוצריא"
