@@ -121,7 +121,7 @@ jobs:
           $pyinstallerArgs += ('"' + $script + '"')
           $argsLine = $pyinstallerArgs -join ' '
           Write-Host "Running: pyinstaller $argsLine"
-          pyinstaller $argsLine
+          pyinstaller @pyinstallerArgs
 
       - name: Sign EXE (signtool) — if certificate available
         if: ${{ steps.prepare_pfx.outputs.have_pfx == 'true' }}
