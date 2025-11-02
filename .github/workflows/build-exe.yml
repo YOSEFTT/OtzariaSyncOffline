@@ -10,7 +10,7 @@ on:
       version_file:
         description: 'נתיב ל־version file בתוך הריפו (rel path). דוגמה: version_info'
         required: false
-        default: 'build/version_info'
+        default: 'version_info'
       python_version:
         description: 'גרסת פייתון לשימוש ב־runner'
         required: false
@@ -164,44 +164,47 @@ jobs:
     needs: build-windows
     if: ${{ github.event.inputs.release_create != 'false' && needs.build-windows.result == 'success' }}
     steps:
+      - name: Checkout repository (to read version file)
+        uses: actions/checkout@v4
+
       - name: Download EXE artifact
         uses: actions/download-artifact@v4
         with:
           name: otzaria_sync_offline.exe
           path: ./dist
 
-      - name: Determine release tag (from input or from version file)
+      - name: Determine release tag (from input or from version file) — no Python
         id: determine_tag
         run: |
-          # אם המשתמש סיפק release_tag נשתמש בו, אחרת ננסה לקרוא את הקובץ
+          # אם סיפקת release_tag נשתמש בו
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
             echo "Using provided release_tag: $TAG"
           else
             VF="${{ github.event.inputs.version_file }}"
             echo "Attempting to read version from file: $VF"
+
             if [ -f "$VF" ]; then
-              # use a small Python parser to extract ProductVersion or FileVersion or filevers tuple
-              VERSION=$(python3 - <<'PY'
-import re,os,sys
-p=os.environ.get('VF')
-s=open(p,encoding='utf-8',errors='ignore').read()
-m=re.search(r"StringStruct\(\s*u?'(?:ProductVersion|FileVersion)'\s*,\s*u?'([^']+)'", s, re.I)
-if not m:
-    m=re.search(r"filevers\s*=\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)", s, re.I)
-    if m:
-        v='{}.{}.{}.{}'.format(m.group(1),m.group(2),m.group(3),m.group(4))
-    else:
-        v=''
-else:
-    v=m.group(1)
-if v and not v.startswith('v'):
-    v='v'+v
-print(v)
-PY
-)
+              # נסה קודם לחלץ ProductVersion / FileVersion מתוך StringStruct
+              VERSION=$(perl -0777 -ne '
+                if ( m{StringStruct\(\s*u?[\'"](?:ProductVersion|FileVersion)[\'"]\s*,\s*u?[\'"]([^\'"]+)[\'"]}i ) {
+                  print $1 and exit;
+                }
+                if ( m{filevers\s*=\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)}i ) {
+                  print "$1.$2.$3.$4" and exit;
+                }
+              ' "$VF" 2>/dev/null || true)
+
+              # Trim whitespace
+              VERSION="$(echo "$VERSION" | tr -d '\r\n' )"
+
               if [ -n "$VERSION" ]; then
-                TAG="$VERSION"
+                # ודא שיש קידומת v
+                case "$VERSION" in
+                  v*) TAG="$VERSION" ;;
+                  *)  TAG="v$VERSION" ;;
+                esac
+                echo "Extracted version: $TAG"
               else
                 echo "Could not extract version from $VF; falling back to run number tag"
                 TAG="v${GITHUB_RUN_NUMBER}"
@@ -212,16 +215,13 @@ PY
             fi
           fi
 
-          # set output
+          # set outputs
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          # also produce a release name
           if [ -n "${{ github.event.inputs.release_name }}" ]; then
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
           else
             echo "name=otzaria_sync_offline ${TAG}" >> $GITHUB_OUTPUT
           fi
-        env:
-          VF: ${{ inputs.version_file }}
 
       - name: Create GitHub Release
         id: create_release
@@ -231,8 +231,7 @@ PY
           release_name: ${{ steps.determine_tag.outputs.name }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EXE to Release
         uses: actions/upload-release-asset@v1
