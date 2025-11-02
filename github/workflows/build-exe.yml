@@ -10,7 +10,7 @@ on:
       version_file:
         description: 'נתיב ל־version file בתוך הריפו (rel path). דוגמה: version_info'
         required: false
-        default: 'build/version_info'
+        default: 'version_info'
       python_version:
         description: 'גרסת פייתון לשימוש ב־runner'
         required: false
