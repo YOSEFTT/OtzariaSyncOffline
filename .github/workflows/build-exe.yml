@@ -94,33 +94,33 @@ jobs:
             Write-Error "Script '$script' not found in repository root. Ensure file is in repo root or update workflow."
             exit 1
           }
+      
           $icon = "${{ inputs.icon_path }}"
           $version = "${{ inputs.version_file }}"
-
+      
           $pyinstallerArgs = @(
             "--noconfirm"
             "--onefile"
             "--windowed"
             "--clean"
           )
-
+      
           if (Test-Path $icon) {
             $pyinstallerArgs += "--icon"
-            $pyinstallerArgs += ('"' + $icon + '"')
+            $pyinstallerArgs += $icon
           } else {
             Write-Host "Icon not found at: $icon  (continuing without icon)"
           }
-
+      
           if (Test-Path $version) {
             $pyinstallerArgs += "--version-file"
-            $pyinstallerArgs += ('"' + $version + '"')
+            $pyinstallerArgs += $version
           } else {
             Write-Host "Version file not found at: $version  (continuing without version-file)"
           }
-
-          $pyinstallerArgs += ('"' + $script + '"')
-          $argsLine = $pyinstallerArgs -join ' '
-          Write-Host "Running: pyinstaller $argsLine"
+      
+          $pyinstallerArgs += $script
+          Write-Host "Running: pyinstaller $($pyinstallerArgs -join ' ')"
           pyinstaller @pyinstallerArgs
 
       - name: Sign EXE (signtool) — if certificate available
