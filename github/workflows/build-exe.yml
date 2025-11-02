@@ -173,7 +173,6 @@ jobs:
       - name: Determine release tag (from input or from version file)
         id: determine_tag
         run: |
-          # אם המשתמש סיפק release_tag נשתמש בו, אחרת ננסה לקרוא את הקובץ
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
             echo "Using provided release_tag: $TAG"
@@ -181,24 +180,21 @@ jobs:
             VF="${{ github.event.inputs.version_file }}"
             echo "Attempting to read version from file: $VF"
             if [ -f "$VF" ]; then
-              VERSION=$(python3 - <<'PY'
-import re, os
-p = os.environ.get('VF')
-s = open(p, encoding='utf-8', errors='ignore').read()
-m = re.search(r"StringStruct\(\s*u?'(?:ProductVersion|FileVersion)'\s*,\s*u?'([^']+)'", s, re.I)
+              VERSION="$(python3 -c "import re,sys,os
+p=sys.argv[1]
+s=open(p,encoding='utf-8',errors='ignore').read()
+m=re.search(r\"StringStruct\\(\\s*u?'(?:ProductVersion|FileVersion)'\\s*,\\s*u?'([^']+)'\", s, re.I)
 if not m:
-    m = re.search(r"filevers\s*=\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)", s, re.I)
+    m=re.search(r\"filevers\\s*=\\s*\\(\\s*([0-9]+)\\s*,\\s*([0-9]+)\\s*,\\s*([0-9]+)\\s*,\\s*([0-9]+)\\s*\\)\", s, re.I)
     if m:
-        v = '{}.{}.{}.{}'.format(m.group(1), m.group(2), m.group(3), m.group(4))
+        v='{}.{}.{}.{}'.format(m.group(1),m.group(2),m.group(3),m.group(4))
     else:
-        v = ''
+        v=''
 else:
-    v = m.group(1)
+    v=m.group(1)
 if v and not v.startswith('v'):
-    v = 'v' + v
-print(v)
-PY
-)
+    v='v'+v
+print(v)" "$VF")"
               if [ -n "$VERSION" ]; then
                 TAG="$VERSION"
               else
@@ -210,8 +206,6 @@ PY
               TAG="v${GITHUB_RUN_NUMBER}"
             fi
           fi
-
-          # set outputs
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           if [ -n "${{ github.event.inputs.release_name }}" ]; then
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
