@@ -183,13 +183,13 @@ jobs:
         id: determine_tag
         run: |
           # אם סיפקת release_tag נשתמש בו
-          if [ -n "${{ github.event.inputs.release_tag }}" ]; then
-            TAG="${{ github.event.inputs.release_tag }}"
+          if [ -n '${{ github.event.inputs.release_tag }}' ]; then
+            TAG='${{ github.event.inputs.release_tag }}'
             echo "Using provided release_tag: $TAG"
           else
-            VF="${{ github.event.inputs.version_file }}"
+            VF='${{ github.event.inputs.version_file }}'
             echo "Attempting to read version from file: $VF"
-
+      
             if [ -f "$VF" ]; then
               # נסה קודם לחלץ ProductVersion / FileVersion מתוך StringStruct
               VERSION=$(perl -0777 -ne '
@@ -200,14 +200,12 @@ jobs:
                   print "$1.$2.$3.$4" and exit;
                 }
               ' "$VF" 2>/dev/null || true)
-
-              # Trim whitespace
-              VERSION="$(echo "$VERSION" | tr -d '\r\n' )"
-              VERSION="$(echo "$VERSION" | tr -d '"' )"
+      
+              # Trim whitespace + quotes
+              VERSION="$(echo "$VERSION" | tr -d '\r\n\"')"
               echo "✅ Version after cleanup: '$VERSION'"
-
+      
               if [ -n "$VERSION" ]; then
-                # ודא שיש קידומת v
                 case "$VERSION" in
                   v*) TAG="$VERSION" ;;
                   *)  TAG="v$VERSION" ;;
@@ -222,10 +220,10 @@ jobs:
               TAG="v${GITHUB_RUN_NUMBER}"
             fi
           fi
-
+      
           # set outputs
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+          if [ -n '${{ github.event.inputs.release_name }}' ]; then
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
           else
             echo "name=otzaria_sync_offline ${TAG}" >> $GITHUB_OUTPUT
