@@ -13,8 +13,9 @@ import concurrent.futures
 import threading
 import time
 import random
+import urllib.request
 from pathlib import Path
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QSpinBox,
                            QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, 
                            QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
                            QGroupBox, QGridLayout, QSpacerItem, QSizePolicy, QMenuBar,
@@ -24,6 +25,8 @@ from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, Q
 from PyQt6.QtWidgets import QGraphicsOpacityEffect
 from urllib.parse import urljoin
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ניסיון לייבא chardet עם fallback
 try:
@@ -910,14 +913,10 @@ class WorkerThread(QThread):
             pass
         
         # הגדרת SSL - פחות מחמיר
-        import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session.verify = False  # זהירות: פחות בטוח אבל עוזר עם בעיות SSL
         
-        # הגדרת timeout וretries
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-        
+        # הגדרת timeout וretries        
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,

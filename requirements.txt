@@ -1,0 +1,5 @@
+requests
+psutil
+PyQt6
+chardet
+urllib3

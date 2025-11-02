@@ -1,0 +1,245 @@
+name: Build otzaria_sync_offline.exe
+
+on:
+  workflow_dispatch:
+    inputs:
+      icon_path:
+        description: 'נתיב לאייקון בתוך הריפו (rel path). דוגמה: build/sync otzaria.ico'
+        required: false
+        default: 'build/sync otzaria.ico'
+      version_file:
+        description: 'נתיב ל־version file בתוך הריפו (rel path). דוגמה: version_info'
+        required: false
+        default: 'build/version_info'
+      python_version:
+        description: 'גרסת פייתון לשימוש ב־runner'
+        required: false
+        default: '3.10.6'
+      release_create:
+        description: 'Create GitHub Release after successful build? (true/false)'
+        required: false
+        default: 'true'
+      release_tag:
+        description: 'Tag for the release (optional). אם ריק -> ייקרא מהקובץ version_file'
+        required: false
+        default: ''
+      release_name:
+        description: 'Release name (optional)'
+        required: false
+        default: ''
+
+jobs:
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install dependencies (PyInstaller)
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          # התקנת תלותיות הריצה מתוך requirements.txt
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt not found in repo root — continuing without it."
+          fi
+
+          # התקנת PyInstaller (ועזרים) לשלב הבנייה
+          pip install pyinstaller pyinstaller-hooks-contrib          
+
+      - name: Prepare certificate from secret (optional)
+        id: prepare_pfx
+        if: ${{ secrets.PFX_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          Write-Host "Decoding PFX from secret PFX_BASE64 -> certificate.pfx"
+          $pfxBase64 = '${{ secrets.PFX_BASE64 }}'
+          [IO.File]::WriteAllBytes('certificate.pfx', [Convert]::FromBase64String($pfxBase64))
+          if (Test-Path certificate.pfx) {
+            Write-Host "PFX written to certificate.pfx"
+            echo "::set-output name=have_pfx::true"
+          } else {
+            echo "::set-output name=have_pfx::false"
+          }
+
+      - name: Build EXE with PyInstaller
+        shell: pwsh
+        env:
+          ICON_PATH: ${{ inputs.icon_path }}
+          VERSION_FILE: ${{ inputs.version_file }}
+        run: |
+          $script = 'otzaria_sync_offline.py'
+          if (-not (Test-Path $script)) {
+            Write-Error "Script '$script' not found in repository root. Ensure file is in repo root or update workflow."
+            exit 1
+          }
+          $icon = "${{ inputs.icon_path }}"
+          $version = "${{ inputs.version_file }}"
+
+          $pyinstallerArgs = @(
+            "--noconfirm"
+            "--onefile"
+            "--windowed"
+            "--clean"
+          )
+
+          if (Test-Path $icon) {
+            $pyinstallerArgs += "--icon"
+            $pyinstallerArgs += ('"' + $icon + '"')
+          } else {
+            Write-Host "Icon not found at: $icon  (continuing without icon)"
+          }
+
+          if (Test-Path $version) {
+            $pyinstallerArgs += "--version-file"
+            $pyinstallerArgs += ('"' + $version + '"')
+          } else {
+            Write-Host "Version file not found at: $version  (continuing without version-file)"
+          }
+
+          $pyinstallerArgs += ('"' + $script + '"')
+          $argsLine = $pyinstallerArgs -join ' '
+          Write-Host "Running: pyinstaller $argsLine"
+          pyinstaller $argsLine
+
+      - name: Sign EXE (signtool) — if certificate available
+        shell: pwsh
+        run: |
+          $exePath = Join-Path $PWD 'dist\otzaria_sync_offline.exe'
+          if (-not (Test-Path $exePath)) {
+            Write-Host "No built EXE found at $exePath — skipping signing."
+            exit 0
+          }
+
+          # find certificate: either certificate.pfx (from secret) or build/certificate.pfx in repo
+          $pfxCandidates = @(
+            Join-Path $PWD 'certificate.pfx',
+            Join-Path $PWD 'build\certificate.pfx',
+            Join-Path $PWD 'certificate.pfx'
+          )
+          $pfx = $null
+          foreach ($c in $pfxCandidates) {
+            if (Test-Path $c) { $pfx = $c; break }
+          }
+
+          if (-not $pfx) {
+            Write-Host "No PFX found in repo or from secret — skipping signing."
+            exit 0
+          }
+
+          if ('${{ secrets.PFX_PASSWORD }}' -eq '') {
+            Write-Host "Warning: PFX found but PFX_PASSWORD secret is empty. Attempting to sign without password (may fail)."
+            $pfxPasswordArg = ""
+          } else {
+            $pfxPasswordArg = "/p '${{ secrets.PFX_PASSWORD }}'"
+          }
+
+          $timestamp = "http://timestamp.digicert.com"
+          Write-Host "Signing $exePath using $pfx"
+          signtool sign /f "`"$pfx`"" $pfxPasswordArg /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "signtool failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          } else {
+            Write-Host "Signing completed."
+          }
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: otzaria_sync_offline.exe
+          path: dist/otzaria_sync_offline.exe
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: build-windows
+    if: ${{ github.event.inputs.release_create != 'false' && needs.build-windows.result == 'success' }}
+    steps:
+      - name: Download EXE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: otzaria_sync_offline.exe
+          path: ./dist
+
+      - name: Determine release tag (from input or from version file)
+        id: determine_tag
+        run: |
+          # אם המשתמש סיפק release_tag נשתמש בו, אחרת ננסה לקרוא את הקובץ
+          if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+            echo "Using provided release_tag: $TAG"
+          else
+            VF="${{ github.event.inputs.version_file }}"
+            echo "Attempting to read version from file: $VF"
+            if [ -f "$VF" ]; then
+              # use a small Python parser to extract ProductVersion or FileVersion or filevers tuple
+              VERSION=$(python3 - <<'PY'
+import re,os,sys
+p=os.environ.get('VF')
+s=open(p,encoding='utf-8',errors='ignore').read()
+m=re.search(r"StringStruct\(\s*u?'(?:ProductVersion|FileVersion)'\s*,\s*u?'([^']+)'", s, re.I)
+if not m:
+    m=re.search(r"filevers\s*=\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)", s, re.I)
+    if m:
+        v='{}.{}.{}.{}'.format(m.group(1),m.group(2),m.group(3),m.group(4))
+    else:
+        v=''
+else:
+    v=m.group(1)
+if v and not v.startswith('v'):
+    v='v'+v
+print(v)
+PY
+)
+              if [ -n "$VERSION" ]; then
+                TAG="$VERSION"
+              else
+                echo "Could not extract version from $VF; falling back to run number tag"
+                TAG="v${GITHUB_RUN_NUMBER}"
+              fi
+            else
+              echo "Version file $VF not found; falling back to run number tag"
+              TAG="v${GITHUB_RUN_NUMBER}"
+            fi
+          fi
+
+          # set output
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          # also produce a release name
+          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=otzaria_sync_offline ${TAG}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          VF: ${{ inputs.version_file }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.determine_tag.outputs.tag }}
+          release_name: ${{ steps.determine_tag.outputs.name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload EXE to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/otzaria_sync_offline.exe
+          asset_name: otzaria_sync_offline.exe
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
