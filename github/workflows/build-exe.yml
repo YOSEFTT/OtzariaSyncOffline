@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       icon_path:
-        description: 'נתיב לאייקון בתוך הריפו (rel path). דוגמה: build/sync otzaria.ico'
+        description: 'נתיב לאייקון בתוך הריפו (rel path). דוגמה: build/sync_otzaria.ico'
         required: false
-        default: 'build/sync otzaria.ico'
+        default: 'build/sync_otzaria.ico'
       version_file:
         description: 'נתיב ל־version file בתוך הריפו (rel path). דוגמה: version_info'
         required: false
