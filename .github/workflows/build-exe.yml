@@ -1,5 +1,7 @@
 name: Build otzaria_sync_offline.exe
-
+permissions:
+  contents: write
+  
 on:
   workflow_dispatch:
     inputs:
@@ -180,12 +182,13 @@ jobs:
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.event.inputs.release_tag }}
           release_name: ${{ github.event.inputs.release_name && github.event.inputs.release_name || format('otzaria_sync_offline {0}', github.event.inputs.release_tag) }}
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EXE to Release
         uses: actions/upload-release-asset@v1
