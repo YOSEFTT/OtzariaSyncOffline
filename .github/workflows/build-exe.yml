@@ -55,20 +55,31 @@ jobs:
           # התקנת PyInstaller (ועזרים) לשלב הבנייה
           pip install pyinstaller pyinstaller-hooks-contrib          
 
-      - name: Prepare certificate from secret (optional)
+      - name: Prepare certificate from secret or repo (optional)
         id: prepare_pfx
-        if: ${{ secrets.PFX_BASE64 != '' }}
         shell: pwsh
         run: |
-          Write-Host "Decoding PFX from secret PFX_BASE64 -> certificate.pfx"
-          $pfxBase64 = '${{ secrets.PFX_BASE64 }}'
-          [IO.File]::WriteAllBytes('certificate.pfx', [Convert]::FromBase64String($pfxBase64))
+          Write-Host "Looking for certificate.pfx in repo root..."
           if (Test-Path certificate.pfx) {
-            Write-Host "PFX written to certificate.pfx"
-            echo "::set-output name=have_pfx::true"
+            Write-Host "Found certificate.pfx in repository root."
+            echo "have_pfx=true" >> $GITHUB_OUTPUT
+          } elseif ($env:PFX_BASE64 -and $env:PFX_BASE64 -ne '') {
+            Write-Host "Decoding PFX from secret PFX_BASE64 -> certificate.pfx"
+            [IO.File]::WriteAllBytes('certificate.pfx', [Convert]::FromBase64String($env:PFX_BASE64))
+            if (Test-Path certificate.pfx) {
+              Write-Host "PFX written to certificate.pfx"
+              echo "have_pfx=true" >> $GITHUB_OUTPUT
+            } else {
+              Write-Host "Failed to write certificate.pfx from secret"
+              echo "have_pfx=false" >> $GITHUB_OUTPUT
+            }
           } else {
-            echo "::set-output name=have_pfx::false"
+            Write-Host "No PFX found in repo and PFX_BASE64 secret empty."
+            echo "have_pfx=false" >> $GITHUB_OUTPUT
           }
+        env:
+          PFX_BASE64: ${{ secrets.PFX_BASE64 }}
+
 
       - name: Build EXE with PyInstaller
         shell: pwsh
@@ -111,6 +122,7 @@ jobs:
           pyinstaller $argsLine
 
       - name: Sign EXE (signtool) — if certificate available
+        if: ${{ steps.prepare_pfx.outputs.have_pfx == 'true' }}
         shell: pwsh
         run: |
           $exePath = Join-Path $PWD 'dist\otzaria_sync_offline.exe'
@@ -119,27 +131,17 @@ jobs:
             exit 0
           }
 
-          # find certificate: either certificate.pfx (from secret) or build/certificate.pfx in repo
-          $pfxCandidates = @(
-            Join-Path $PWD 'certificate.pfx',
-            Join-Path $PWD 'build\certificate.pfx',
-            Join-Path $PWD 'certificate.pfx'
-          )
-          $pfx = $null
-          foreach ($c in $pfxCandidates) {
-            if (Test-Path $c) { $pfx = $c; break }
+          $pfx = Join-Path $PWD 'certificate.pfx'
+          if (-not (Test-Path $pfx)) {
+            Write-Host "certificate.pfx not found where expected ($pfx) — skipping signing."
+            exit 1
           }
 
-          if (-not $pfx) {
-            Write-Host "No PFX found in repo or from secret — skipping signing."
-            exit 0
-          }
-
-          if ('${{ secrets.PFX_PASSWORD }}' -eq '') {
-            Write-Host "Warning: PFX found but PFX_PASSWORD secret is empty. Attempting to sign without password (may fail)."
-            $pfxPasswordArg = ""
+          if ($env:PFX_PASSWORD -and $env:PFX_PASSWORD -ne '') {
+            $pfxPasswordArg = "/p `"$env:PFX_PASSWORD`""
           } else {
-            $pfxPasswordArg = "/p '${{ secrets.PFX_PASSWORD }}'"
+            $pfxPasswordArg = ""
+            Write-Host "PFX_PASSWORD secret empty — attempting to sign without password (may fail)."
           }
 
           $timestamp = "http://timestamp.digicert.com"
@@ -151,6 +153,8 @@ jobs:
           } else {
             Write-Host "Signing completed."
           }
+        env:
+          PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
