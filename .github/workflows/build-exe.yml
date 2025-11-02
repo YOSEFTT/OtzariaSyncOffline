@@ -204,6 +204,7 @@ jobs:
               # Trim whitespace
               VERSION="$(echo "$VERSION" | tr -d '\r\n' )"
               VERSION="$(echo "$VERSION" | tr -d '"' )"
+              echo "✅ Version after cleanup: '$VERSION'"
 
               if [ -n "$VERSION" ]; then
                 # ודא שיש קידומת v
