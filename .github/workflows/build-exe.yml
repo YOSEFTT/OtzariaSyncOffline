@@ -1,5 +1,7 @@
 name: Build otzaria_sync_offline.exe
-
+permissions:
+  contents: write
+  
 on:
   workflow_dispatch:
     inputs:
@@ -7,10 +9,6 @@ on:
         description: 'נתיב לאייקון בתוך הריפו (rel path). דוגמה: build/sync_otzaria.ico'
         required: false
         default: 'build/sync_otzaria.ico'
-      version_file:
-        description: 'נתיב ל־version file בתוך הריפו (rel path). דוגמה: version_info'
-        required: false
-        default: 'version_info'
       python_version:
         description: 'גרסת פייתון לשימוש ב־runner'
         required: false
@@ -20,8 +18,8 @@ on:
         required: false
         default: 'true'
       release_tag:
-        description: 'Tag for the release (optional). אם ריק -> ייקרא מהקובץ version_file'
-        required: false
+        description: 'Tag for the release — יש למלא ידנית (לדוגמה: v2.5.0)'
+        required: true
         default: ''
       release_name:
         description: 'Release name (optional)'
@@ -55,7 +53,6 @@ jobs:
 
           # התקנת PyInstaller (ועדכונים לשעת build)
           pip install pyinstaller pyinstaller-hooks-contrib
-       
 
       - name: Prepare certificate from secret or repo (optional)
         id: prepare_pfx
@@ -82,20 +79,18 @@ jobs:
         env:
           PFX_BASE64: ${{ secrets.PFX_BASE64 }}
 
-
       - name: Build EXE with PyInstaller
         shell: pwsh
         env:
           ICON_PATH: ${{ inputs.icon_path }}
-          VERSION_FILE: ${{ inputs.version_file }}
         run: |
           $script = 'otzaria_sync_offline.py'
           if (-not (Test-Path $script)) {
             Write-Error "Script '$script' not found in repository root. Ensure file is in repo root or update workflow."
             exit 1
           }
+
           $icon = "${{ inputs.icon_path }}"
-          $version = "${{ inputs.version_file }}"
 
           $pyinstallerArgs = @(
             "--noconfirm"
@@ -106,21 +101,18 @@ jobs:
 
           if (Test-Path $icon) {
             $pyinstallerArgs += "--icon"
-            $pyinstallerArgs += ('"' + $icon + '"')
+            $pyinstallerArgs += $icon
           } else {
             Write-Host "Icon not found at: $icon  (continuing without icon)"
           }
 
-          if (Test-Path $version) {
-            $pyinstallerArgs += "--version-file"
-            $pyinstallerArgs += ('"' + $version + '"')
-          } else {
-            Write-Host "Version file not found at: $version  (continuing without version-file)"
-          }
+          $pyinstallerArgs += $script
+          Write-Host "Running: pyinstaller $($pyinstallerArgs -join ' ')"
 
-          $pyinstallerArgs += ('"' + $script + '"')
-          $argsLine = $pyinstallerArgs -join ' '
-          Write-Host "Running: pyinstaller $argsLine"
+          # show files to help debugging
+          Write-Host "📁 Files in current directory (top-level):"
+          Get-ChildItem | Select-Object Name
+
           pyinstaller @pyinstallerArgs
 
       - name: Sign EXE (signtool) — if certificate available
@@ -170,7 +162,7 @@ jobs:
     needs: build-windows
     if: ${{ github.event.inputs.release_create != 'false' && needs.build-windows.result == 'success' }}
     steps:
-      - name: Checkout repository (to read version file)
+      - name: Checkout repository (to read repository if needed)
         uses: actions/checkout@v4
 
       - name: Download EXE artifact
@@ -179,65 +171,24 @@ jobs:
           name: otzaria_sync_offline.exe
           path: ./dist
 
-      - name: Determine release tag (from input or from version file) — no Python
-        id: determine_tag
+      - name: Validate release_tag input
         run: |
-          # אם סיפקת release_tag נשתמש בו
-          if [ -n "${{ github.event.inputs.release_tag }}" ]; then
-            TAG="${{ github.event.inputs.release_tag }}"
-            echo "Using provided release_tag: $TAG"
-          else
-            VF="${{ github.event.inputs.version_file }}"
-            echo "Attempting to read version from file: $VF"
-
-            if [ -f "$VF" ]; then
-              # נסה קודם לחלץ ProductVersion / FileVersion מתוך StringStruct
-              VERSION=$(perl -0777 -ne '
-                if ( m{StringStruct\(\s*u?[\'"](?:ProductVersion|FileVersion)[\'"]\s*,\s*u?[\'"]([^\'"]+)[\'"]}i ) {
-                  print $1 and exit;
-                }
-                if ( m{filevers\s*=\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)}i ) {
-                  print "$1.$2.$3.$4" and exit;
-                }
-              ' "$VF" 2>/dev/null || true)
-
-              # Trim whitespace
-              VERSION="$(echo "$VERSION" | tr -d '\r\n' )"
-
-              if [ -n "$VERSION" ]; then
-                # ודא שיש קידומת v
-                case "$VERSION" in
-                  v*) TAG="$VERSION" ;;
-                  *)  TAG="v$VERSION" ;;
-                esac
-                echo "Extracted version: $TAG"
-              else
-                echo "Could not extract version from $VF; falling back to run number tag"
-                TAG="v${GITHUB_RUN_NUMBER}"
-              fi
-            else
-              echo "Version file $VF not found; falling back to run number tag"
-              TAG="v${GITHUB_RUN_NUMBER}"
-            fi
-          fi
-
-          # set outputs
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          if [ -n "${{ github.event.inputs.release_name }}" ]; then
-            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "name=otzaria_sync_offline ${TAG}" >> $GITHUB_OUTPUT
+          # שימו לב: משתמשים ב־single quotes סביב הביטוי כדי להימנע מבעיות ציטוט
+          if [ -z '${{ github.event.inputs.release_tag }}' ]; then
+            echo "release_tag input is empty — יש למלא את release_tag בעת הרצת ה־workflow"
+            exit 1
           fi
 
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.determine_tag.outputs.tag }}
-          release_name: ${{ steps.determine_tag.outputs.name }}
+          tag_name: ${{ github.event.inputs.release_tag }}
+          release_name: ${{ github.event.inputs.release_name && github.event.inputs.release_name || format('otzaria_sync_offline {0}', github.event.inputs.release_tag) }}
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EXE to Release
         uses: actions/upload-release-asset@v1
