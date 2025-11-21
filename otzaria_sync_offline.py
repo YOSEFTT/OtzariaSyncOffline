@@ -89,6 +89,7 @@ BASE_PATH = "אוצריא"
 LOCAL_PATH = ""
 DEL_LIST_FILE_NAME = "del_list.txt"
 MANIFEST_FILE_NAME = "files_manifest.json"
+DICTA_MANIFEST_FILE_NAME = "files_manifest_dicta.json"
 STATE_FILE_NAME = "sync_state.json"
 COPIED_DICTA = False
 
@@ -1269,12 +1270,11 @@ class WorkerThread(QThread):
                 self.status.emit(f"הועתק: {MANIFEST_FILE_NAME}")
             
             # העתקת קובץ המניפסט של דיקטה (אופציונלי)
-            dicta_manifest = f"dicta_{MANIFEST_FILE_NAME}"
-            src = os.path.join(LOCAL_PATH, dicta_manifest)
+            src = os.path.join(LOCAL_PATH, DICTA_MANIFEST_FILE_NAME)
             if os.path.exists(src):
-                dst = os.path.join(BASE_PATH, dicta_manifest)
+                dst = os.path.join(BASE_PATH, DICTA_MANIFEST_FILE_NAME)
                 shutil.copy(src, dst)
-                self.status.emit(f"הועתק: {dicta_manifest}")
+                self.status.emit(f"הועתק: {DICTA_MANIFEST_FILE_NAME}")
                 # אם הגענו לכאן – יש מניפסט דיקטה
                 copied_dicta = True
             COPIED_DICTA = copied_dicta  # הוספה - שמירת המצב הגלובלי
@@ -1352,7 +1352,7 @@ class WorkerThread(QThread):
         # בדיקת חיבור אינטרנט משופרת
         def test_internet_connection():
             test_urls = [
-                "https://github.com/zevisvei/otzaria-library"
+                "https://github.com/Y-PLONI/otzaria-library"
             ]
             
             for url in test_urls:
@@ -1397,14 +1397,16 @@ class WorkerThread(QThread):
         # קביעת אילו מניפסטים לעבד
         manifests_to_process = []
         if COPIED_DICTA:  # אם יש קובץ דיקטה - סנכרן את שניהם
-            manifests_to_process = ["files_manifest.json", "dicta_files_manifest.json"]
+            manifests_to_process = [MANIFEST_FILE_NAME, DICTA_MANIFEST_FILE_NAME]
         else:  # אם אין קובץ דיקטה - סנכרן רק את הרגיל
-            manifests_to_process = ["files_manifest.json"]        
+            manifests_to_process = [MANIFEST_FILE_NAME]        
 
         all_failed_files = []
         all_file_tasks = []  # רשימת כל הקבצים להורדה
         
         # איסוף כל המשימות
+        all_deleted_files = []  # רשימת קבצים שנמחקו
+        
         for manifest_file in manifests_to_process:
             self.status.emit(f"מעבד: {manifest_file}")
             
@@ -1423,14 +1425,19 @@ class WorkerThread(QThread):
                 # הכנת משימות הורדה
                 for book_name, value in new_manifest_content.items():
                     if value["hash"] != old_manifest_content.get(book_name, {}).get("hash"):
-                        target_path = os.path.join(BASE_PATH, book_name.replace("/", os.sep))
+                        # חישוב target_path לפי הלוגיקה החדשה
+                        target_folder_components = book_name.split("/")
+                        file_type = "אוצריא" if "אוצריא" in target_folder_components else "links"
+                        target_path_parts = target_folder_components[target_folder_components.index(file_type):]
+                        target_path = os.path.join(BASE_PATH, *target_path_parts)
                         
-                        if manifest_file == "dicta_files_manifest.json":
-                            file_url = f"{BASE_URL}DictaToOtzaria/ספרים/לא ערוך/{book_name.replace(r'/דיקטה', '')}"
-                        else:
-                            file_url = f"{BASE_URL}{book_name}"
+                        file_url = f"{BASE_URL}{book_name}"
                         
                         all_file_tasks.append((book_name, file_url, target_path))
+
+                # איסוף קבצים שנמחקו מהמניפסט
+                del_list = [book_name.replace("/", os.sep) for book_name in old_manifest_content if book_name not in new_manifest_content]
+                all_deleted_files.extend(del_list)
 
                 # עדכון המניפסט
                 with open(old_manifest_file_path, "w", encoding="utf-8") as f:
@@ -1439,6 +1446,12 @@ class WorkerThread(QThread):
             except Exception as e:
                 self.finished.emit(False, f"שגיאה בעיבוד {manifest_file}: {str(e)}")
                 return
+        
+        # כתיבת קובץ del_list אם יש קבצים שנמחקו
+        if all_deleted_files:
+            del_list_file_path = os.path.join(BASE_PATH, DEL_LIST_FILE_NAME)
+            with open(del_list_file_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(all_deleted_files) + "\n")
 
         # הורדה מקבילה עם התאמה דינמית של מספר החוטים
         if all_file_tasks:
@@ -1639,13 +1652,12 @@ class WorkerThread(QThread):
                         return
                     
                     file_path = file_path.strip()
-                    if not file_path:  # שורה חדשה
-                        continue  # שורה חדשה
-                    if file_path:
-                        full_path = os.path.join(LOCAL_PATH, file_path)
-                        if os.path.exists(full_path):
-                            os.remove(full_path)
-                            deleted_count += 1
+                    if not file_path:
+                        continue
+                    full_path = os.path.join(LOCAL_PATH, file_path)
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
+                        deleted_count += 1
                 
                 os.remove(del_list_file_path)
                 self.status.emit(f"נמחקו {deleted_count} קבצים")
