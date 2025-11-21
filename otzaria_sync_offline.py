@@ -3217,10 +3217,12 @@ class ShortcutManager:
         try:
             QMessageBox.information(
                 self.main_window,
-                "אודות אוצריא סינק",
-                "אוצריא סינק - גרסה 2.0\n\n"
-                "תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט\n"
-                "פותח על ידי צוות אוצריא\n\n"
+                "אודות אוצריא - סנכרון אופליין",
+                "אוצריא - סנכרון אופליין\n"
+                 "גרסה 3.0\n\n"
+                "תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט\n\n"
+                "פותח על ידי מתנדבי אוצריא  להצלחת לומדי התורה הקדושה\n"
+                "ובפרט אלו שזכו להתנתק מהרשת לגמרי, אשריהם ואשרי חלקם!!!\n\n"
                 "לחץ F1 לקבלת עזרה וקיצורי מקלדת"
             )
         except Exception as e:
@@ -3327,8 +3329,8 @@ class OtzariaSync(QMainWindow):
         
         # התאמת גודל חלון למסך
         screen = QApplication.primaryScreen().availableGeometry()
-        window_width = min(800, int(screen.width() * 0.8))
-        window_height = min(700, int(screen.height() * 0.8))
+        window_width = min(1200, int(screen.width() * 0.85))
+        window_height = min(700, int(screen.height() * 0.85))
         
         self.setGeometry(100, 100, window_width, window_height)
         self.setMinimumSize(600, 400)  # הקטנת מינימום
@@ -3389,12 +3391,12 @@ class OtzariaSync(QMainWindow):
         title_font.setPointSize(20)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #2E4057; margin-bottom: 15px; padding: 10px;")
+        title_label.setStyleSheet("color: #2E4057; margin-bottom: 0px; padding: 1px;")
         
         # תת-כותרת
         subtitle_label = QLabel("תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle_label.setStyleSheet("color: #5A6C7D; margin-bottom: 20px; font-size: 14px;")
+        subtitle_label.setStyleSheet("color: #5A6C7D; margin-bottom: 10px; font-size: 14px;")
         
         # מסגרת לכפתורים
         buttons_frame = QFrame()
@@ -3507,12 +3509,15 @@ class OtzariaSync(QMainWindow):
         
         # כפתורי בקרה
         control_layout = QHBoxLayout()
+        control_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # מרכוז הכפתורים
         
         self.btn_pause = AnimatedButton("   השהה")
         self.btn_pause.setIcon(self.icon_manager.get_icon('pause', size=16))
         self.btn_pause.setIconSize(QSize(16, 16))
         self.btn_pause.setToolTip("השהה או המשך את התהליך הנוכחי\nקיצור מקלדת: Ctrl+P")
         self.btn_pause.setMinimumHeight(40)
+        self.btn_pause.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # רוחב קבוע
+        self.btn_pause.setMinimumWidth(120)  # רוחב מינימלי
         pause_original_style = """
             QPushButton {
                 background-color: #FF9800 !important;
@@ -3542,6 +3547,8 @@ class OtzariaSync(QMainWindow):
         self.btn_cancel.setIconSize(QSize(16, 16))
         self.btn_cancel.setToolTip("בטל את התהליך הנוכחי\nקיצור מקלדת: Escape")
         self.btn_cancel.setMinimumHeight(40)
+        self.btn_cancel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # רוחב קבוע
+        self.btn_cancel.setMinimumWidth(120)  # רוחב מינימלי
         cancel_complete_style = """
             QPushButton {
                 background-color: #f44336 !important;
@@ -3570,6 +3577,8 @@ class OtzariaSync(QMainWindow):
         self.btn_reset_data.setIconSize(QSize(16, 16))
         self.btn_reset_data.setToolTip("מאפס את מצב ההתקדמות ומתחיל מחדש\nקיצור מקלדת: Ctrl+R")
         self.btn_reset_data.setMinimumHeight(40)
+        self.btn_reset_data.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # רוחב קבוע
+        self.btn_reset_data.setMinimumWidth(120)  # רוחב מינימלי (הכפתור הרחב ביותר)
         reset_complete_style = """
             QPushButton {
                 background-color: #9C27B0 !important;
@@ -3676,14 +3685,19 @@ class OtzariaSync(QMainWindow):
         sync_layout.addWidget(subtitle_label)
         sync_layout.addWidget(self.status_label)
         
-        # שורה ראשונה - כפתור טעינת מניפסטים וכפתור בחירה ידנית
-        first_row_layout = QHBoxLayout()
-        first_row_layout.addWidget(self.btn_load_manifests)
-        first_row_layout.addWidget(self.btn_manual_select)
-        buttons_layout.addLayout(first_row_layout)
+        # שורה ראשונה - שלושת הכפתורים הראשיים באותה שורה
+        main_buttons_row = QHBoxLayout()
+        main_buttons_row.setSpacing(10)
+        main_buttons_row.addWidget(self.btn_load_manifests)
+        main_buttons_row.addWidget(self.btn_download_updates)
+        main_buttons_row.addWidget(self.btn_apply_updates)
+        buttons_layout.addLayout(main_buttons_row)
         
-        buttons_layout.addWidget(self.btn_download_updates)
-        buttons_layout.addWidget(self.btn_apply_updates)
+        # שורה שנייה - כפתור בחירה ידנית (יוצג רק כשצריך)
+        manual_select_row = QHBoxLayout()
+        manual_select_row.addWidget(self.btn_manual_select)
+        buttons_layout.addLayout(manual_select_row)
+        
         buttons_frame.setLayout(buttons_layout)
         sync_layout.addWidget(buttons_frame)
         
@@ -3704,7 +3718,7 @@ class OtzariaSync(QMainWindow):
         self.btn_expand_log = QPushButton("▲")
         self.btn_expand_log.setMaximumWidth(30)
         self.btn_expand_log.setMaximumHeight(25)
-        self.btn_expand_log.setToolTip("הגדל את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+Up")
+        self.btn_expand_log.setToolTip("הגדל את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+⬆")
         self.btn_expand_log.setStyleSheet("""
             QPushButton {
                 background-color: #E3F2FD;
@@ -3721,7 +3735,7 @@ class OtzariaSync(QMainWindow):
         self.btn_shrink_log = QPushButton("▼")
         self.btn_shrink_log.setMaximumWidth(30)
         self.btn_shrink_log.setMaximumHeight(25)
-        self.btn_shrink_log.setToolTip("הקטן את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+Down")
+        self.btn_shrink_log.setToolTip("הקטן את איזור יומן הפעולות\nקיצור מקלדת: Ctrl+⬇")
         self.btn_shrink_log.setStyleSheet("""
             QPushButton {
                 background-color: #E3F2FD;
@@ -3988,7 +4002,7 @@ class OtzariaSync(QMainWindow):
         font_layout.addLayout(font_buttons_layout)
         
         # תצוגה מקדימה של גופן
-        self.font_preview = QLabel("דוגמה לטקסט בגופן הנוכחי - אוצריא סינק")
+        self.font_preview = QLabel("דוגמה לטקסט בגופן הנוכחי - סנכרון אוצריא")
         self.font_preview.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;")
         font_layout.addWidget(self.font_preview)
         
