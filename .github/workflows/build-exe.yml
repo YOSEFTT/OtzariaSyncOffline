@@ -124,6 +124,23 @@ jobs:
 
           pyinstaller @pyinstallerArgs
 
+      - name: Setup signtool (Windows SDK)
+        if: ${{ steps.prepare_pfx.outputs.have_pfx == 'true' }}
+        shell: pwsh
+        run: |
+          # מציאת signtool ב-Windows SDK
+          $signtoolPath = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\" -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue | 
+                          Where-Object { $_.FullName -like "*x64*" } | 
+                          Select-Object -First 1 -ExpandProperty DirectoryName
+          
+          if ($signtoolPath) {
+            Write-Host "Found signtool at: $signtoolPath"
+            echo "$signtoolPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "signtool not found in Windows SDK"
+            exit 1
+          }
+
       - name: Sign EXE (signtool) — if certificate available
         if: ${{ steps.prepare_pfx.outputs.have_pfx == 'true' }}
         shell: pwsh
@@ -149,7 +166,13 @@ jobs:
 
           $timestamp = "http://timestamp.digicert.com"
           Write-Host "Signing $exePath using $pfx"
-          signtool sign /f "`"$pfx`"" $pfxPasswordArg /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+          
+          if ($pfxPasswordArg) {
+            & signtool sign /f "`"$pfx`"" $pfxPasswordArg /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+          } else {
+            & signtool sign /f "`"$pfx`"" /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+          }
+          
           if ($LASTEXITCODE -ne 0) {
             Write-Host "signtool failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
