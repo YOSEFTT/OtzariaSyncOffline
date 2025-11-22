@@ -58,23 +58,23 @@ jobs:
         id: prepare_pfx
         shell: pwsh
         run: |
-          Write-Host "Looking for certificate.pfx in repo root..."
-          if (Test-Path certificate.pfx) {
-            Write-Host "Found certificate.pfx in repository root."
-            echo "have_pfx=true" >> $GITHUB_OUTPUT
+          Write-Host "Looking for certificate.pfx in build folder..."
+          if (Test-Path build/certificate.pfx) {
+            Write-Host "Found certificate.pfx in build folder."
+            "have_pfx=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } elseif ($env:PFX_BASE64 -and $env:PFX_BASE64 -ne '') {
-            Write-Host "Decoding PFX from secret PFX_BASE64 -> certificate.pfx"
-            [IO.File]::WriteAllBytes('certificate.pfx', [Convert]::FromBase64String($env:PFX_BASE64))
-            if (Test-Path certificate.pfx) {
-              Write-Host "PFX written to certificate.pfx"
-              echo "have_pfx=true" >> $GITHUB_OUTPUT
+            Write-Host "Decoding PFX from secret PFX_BASE64 -> build/certificate.pfx"
+            [IO.File]::WriteAllBytes('build/certificate.pfx', [Convert]::FromBase64String($env:PFX_BASE64))
+            if (Test-Path build/certificate.pfx) {
+              Write-Host "PFX written to build/certificate.pfx"
+              "have_pfx=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             } else {
               Write-Host "Failed to write certificate.pfx from secret"
-              echo "have_pfx=false" >> $GITHUB_OUTPUT
+              "have_pfx=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             }
           } else {
-            Write-Host "No PFX found in repo and PFX_BASE64 secret empty."
-            echo "have_pfx=false" >> $GITHUB_OUTPUT
+            Write-Host "No PFX found in build folder and PFX_BASE64 secret empty."
+            "have_pfx=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           }
         env:
           PFX_BASE64: ${{ secrets.PFX_BASE64 }}
@@ -91,6 +91,7 @@ jobs:
           }
 
           $icon = "${{ inputs.icon_path }}"
+          $versionFile = "build/version_info.txt"
 
           $pyinstallerArgs = @(
             "--noconfirm"
@@ -104,6 +105,14 @@ jobs:
             $pyinstallerArgs += $icon
           } else {
             Write-Host "Icon not found at: $icon  (continuing without icon)"
+          }
+
+          if (Test-Path $versionFile) {
+            Write-Host "Found version file at: $versionFile"
+            $pyinstallerArgs += "--version-file"
+            $pyinstallerArgs += $versionFile
+          } else {
+            Write-Host "Version file not found at: $versionFile  (continuing without version info)"
           }
 
           $pyinstallerArgs += $script
@@ -125,7 +134,7 @@ jobs:
             exit 0
           }
 
-          $pfx = Join-Path $PWD 'certificate.pfx'
+          $pfx = Join-Path $PWD 'build\certificate.pfx'
           if (-not (Test-Path $pfx)) {
             Write-Host "certificate.pfx not found where expected ($pfx) — skipping signing."
             exit 1
