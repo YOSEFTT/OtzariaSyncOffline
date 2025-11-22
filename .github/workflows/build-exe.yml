@@ -157,27 +157,36 @@ jobs:
             exit 1
           }
 
-          if ($env:PFX_PASSWORD -and $env:PFX_PASSWORD -ne '') {
-            $pfxPasswordArg = "/p `"$env:PFX_PASSWORD`""
-          } else {
-            $pfxPasswordArg = ""
-            Write-Host "PFX_PASSWORD secret empty — attempting to sign without password (may fail)."
-          }
-
           $timestamp = "http://timestamp.digicert.com"
           Write-Host "Signing $exePath using $pfx"
           
-          if ($pfxPasswordArg) {
-            & signtool sign /f "`"$pfx`"" $pfxPasswordArg /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+          # בניית הפקודה כמערך
+          $signArgs = @(
+            'sign'
+            '/f', $pfx
+            '/fd', 'SHA256'
+            '/v'
+            '/a'
+            '/t', $timestamp
+          )
+          
+          if ($env:PFX_PASSWORD -and $env:PFX_PASSWORD -ne '') {
+            $signArgs += '/p', $env:PFX_PASSWORD
+            Write-Host "Using password for certificate"
           } else {
-            & signtool sign /f "`"$pfx`"" /fd SHA256 /v /a /t $timestamp "`"$exePath`""
+            Write-Host "PFX_PASSWORD secret empty — attempting to sign without password (may fail)."
           }
+          
+          $signArgs += $exePath
+          
+          Write-Host "Running: signtool $($signArgs -join ' ')"
+          & signtool @signArgs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Host "signtool failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
           } else {
-            Write-Host "Signing completed."
+            Write-Host "Signing completed successfully."
           }
         env:
           PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
