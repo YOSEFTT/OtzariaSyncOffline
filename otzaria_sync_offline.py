@@ -16,12 +16,13 @@ import random
 import urllib.request
 from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QSpinBox,
-                           QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, 
+                           QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, QDialog,
                            QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
                            QGroupBox, QGridLayout, QSpacerItem, QSizePolicy, QMenuBar,
                            QMenu, QStatusBar, QSplitter, QTabWidget, QScrollArea)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup, QSequentialAnimationGroup, pyqtProperty, QSettings, QPoint, QSize
-from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence, QAction, QShortcut, QPainter
+from PyQt6.QtGui import (QFont, QPixmap, QPalette, QColor, QIcon, QKeySequence,
+                        QClipboard, QAction, QShortcut, QPainter)
 from PyQt6.QtWidgets import QGraphicsOpacityEffect
 from urllib.parse import urljoin
 from datetime import datetime
@@ -4946,211 +4947,115 @@ class OtzariaSync(QMainWindow):
         """הצגת הודעת הצלחה למשתמש"""
         QMessageBox.information(self, title, message)
         self.log(f"הצלחה: {message}")
-    
+
     def show_version_53_warning(self):
         """הצגת הודעת אזהרה לגירסת ספרייה 53 ומטה"""
         try:
             # בדיקה אם המשתמש ביקש לא להציג את ההודעה שוב
             dont_show_again = self.settings.value("dont_show_version_53_warning", False, type=bool)
-            
             if dont_show_again:
                 return
-            
-            # יצירת חלון דיאלוג מותאם אישית במקום QMessageBox
-            dialog = QWidget(self, Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
+
+            # 1. יצירת דיאלוג גמיש במקום MessageBox
+            dialog = QDialog(self)
             dialog.setWindowTitle("⚠️ הודעה חשובה")
             dialog.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-            dialog.setMinimumWidth(600)
             
-            # Layout ראשי
-            main_layout = QVBoxLayout()
+            # החזרת כפתור ה-X והגדרת החלון
+            dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowTitleHint)
+
+            # הגדרת לייאוט ראשי
+            main_layout = QVBoxLayout(dialog)
             main_layout.setSpacing(15)
-            main_layout.setContentsMargins(20, 20, 20, 20)
+
+            # טקסט עליון
+            top_text = """
+            <div style='font-size: 14px; color: #333;'>
+                <h3 style='color: #d32f2f; margin: 0 0 10px 0;'>⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה</h3>
+                <p>אם יש לך <strong>גירסת ספרייה 53 או נמוך מזה,</strong><br>
+                תוכנת הסנכרון אופליין תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.<br><br>
+                <b>מכיוון שדרך תוכנת הסנכרון אופליין זה לוקח המון זמן,</b>
+                מומלץ מאוד להוריד את המאגר כולו מחדש דרך קובץ הזיפ (ZIP) מהקישור הבא:
+            </div>
+            """
+            lbl_top = QLabel(top_text)
+            lbl_top.setTextFormat(Qt.TextFormat.RichText)
+            lbl_top.setWordWrap(True)
+            main_layout.addWidget(lbl_top)
+
+            # --- שורה מיוחדת: קישור + כפתור העתקה צמודים ---
+            url_link = "https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip"
             
-            # כותרת
-            title_label = QLabel("⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה")
-            title_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-            title_font = QFont()
-            title_font.setPointSize(14)
-            title_font.setBold(True)
-            title_label.setFont(title_font)
-            title_label.setStyleSheet("color: #d32f2f; padding: 10px;")
-            title_label.setWordWrap(True)
-            main_layout.addWidget(title_label)
+            link_container = QWidget()
+            link_container.setStyleSheet("background-color: #e3f2fd; border-radius: 5px; border: 1px solid #bbdefb;")
+            link_layout = QHBoxLayout(link_container)
+            link_layout.setContentsMargins(10, 5, 10, 5)
             
-            # תוכן ההודעה
-            content_label = QLabel(
-                "אם יש לך <b>גירסת ספרייה מספר 53 או נמוך מזה</b>, תוכנת הסנכרון אופליין "
-                "תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.<br><br>"
-                "<b>מכיוון שזה לוקח המון זמן</b>, מומלץ מאוד להוריד את המאגר כולו מחדש "
-                "דרך קובץ הזיפ ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים."
-            )
-            content_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-            content_label.setWordWrap(True)
-            content_label.setStyleSheet("color: #333; line-height: 1.6; padding: 10px; font-size: 13px;")
-            main_layout.addWidget(content_label)
+            # הקישור עצמו
+            lbl_link = QLabel(f"<a href='{url_link}' style='text-decoration: none; color: #1976d2; font-family: monospace; font-weight: bold;'>otzaria_latest.zip</a>")
+            lbl_link.setOpenExternalLinks(True)
             
-            # מסגרת לקישור עם כפתור העתקה
-            link_frame = QFrame()
-            link_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #e3f2fd;
-                    border: 1px solid #90caf9;
-                    border-radius: 5px;
-                    padding: 10px;
-                }
+            # כפתור העתקה קטן
+            btn_copy = QPushButton("העתק קישור")
+            btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_copy.setStyleSheet("""
+                QPushButton { background-color: white; color: #1976d2; border: 1px solid #1976d2; border-radius: 3px; padding: 2px 8px; font-size: 12px; }
+                QPushButton:hover { background-color: #e3f2fd; }
             """)
-            link_layout = QHBoxLayout()
-            link_layout.setSpacing(10)
             
-            # הקישור
-            zip_url = "https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip"
-            link_label = QLabel(f'<a href="{zip_url}" style="color: #1976d2; font-weight: bold; text-decoration: none;">{zip_url}</a>')
-            link_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-            link_label.setOpenExternalLinks(True)
-            link_label.setWordWrap(True)
-            link_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-            link_label.setStyleSheet("padding: 5px; font-size: 12px;")
+            def copy_link():
+                QApplication.clipboard().setText(url_link)
+                btn_copy.setText("הועתק!")
+                
+            btn_copy.clicked.connect(copy_link)
+
+            link_layout.addWidget(lbl_link)
+            link_layout.addWidget(btn_copy)
+            link_layout.addStretch() # דוחף את התוכן לימין
             
-            # כפתור העתקה
-            copy_button = QPushButton("📋 העתק קישור")
-            copy_button.setToolTip("העתק את הקישור ללוח")
-            copy_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #1976d2;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    padding: 8px 16px;
-                    font-weight: bold;
-                    min-width: 120px;
-                }
-                QPushButton:hover {
-                    background-color: #1565c0;
-                }
-                QPushButton:pressed {
-                    background-color: #0d47a1;
-                }
-            """)
-            copy_button.clicked.connect(lambda: self.copy_to_clipboard(zip_url, dialog))
+            main_layout.addWidget(link_container)
+
+            # טקסט תחתון
+            lbl_bottom = QLabel("ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים.")
+            lbl_bottom.setStyleSheet("font-size: 14px;")
+            main_layout.addWidget(lbl_bottom)
+
+            # --- שורה תחתונה: צ'קבוקס וכפתור סגירה באותה שורה ---
+            bottom_layout = QHBoxLayout()
             
-            link_layout.addWidget(copy_button)
-            link_layout.addWidget(link_label, 1)
-            link_frame.setLayout(link_layout)
-            main_layout.addWidget(link_frame)
+            chk_dont_show = QCheckBox("אל תזכיר לי עוד פעם")
+            chk_dont_show.setStyleSheet("color: #333; font-weight: bold;")
             
-            # Checkbox "אל תזכיר עוד פעם"
-            dont_show_checkbox = QCheckBox("אל תזכיר לי עוד פעם")
-            dont_show_checkbox.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-            dont_show_checkbox.setStyleSheet("""
-                QCheckBox {
-                    color: #333;
-                    font-weight: bold;
-                    spacing: 8px;
-                    padding: 10px;
-                }
-                QCheckBox::indicator {
-                    width: 18px;
-                    height: 18px;
-                    border: 2px solid #f44336;
-                    border-radius: 3px;
-                    background-color: white;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #f44336;
-                }
-            """)
-            main_layout.addWidget(dont_show_checkbox, alignment=Qt.AlignmentFlag.AlignRight)
+            btn_close = QPushButton("סגור")
+            btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_close.setMinimumWidth(100)
+            btn_close.clicked.connect(dialog.accept) # סוגר את החלון
+
+            bottom_layout.addWidget(chk_dont_show)
+            bottom_layout.addStretch() # יוצר רווח גמיש באמצע
+            bottom_layout.addWidget(btn_close)
             
-            # כפתור סגירה
-            button_layout = QHBoxLayout()
-            close_button = QPushButton("סגור")
-            close_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #f44336;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    padding: 10px 30px;
-                    font-weight: bold;
-                    min-width: 100px;
-                }
-                QPushButton:hover {
-                    background-color: #d32f2f;
-                }
-                QPushButton:pressed {
-                    background-color: #c62828;
-                }
-            """)
-            close_button.clicked.connect(dialog.close)
-            button_layout.addStretch()
-            button_layout.addWidget(close_button)
-            button_layout.addStretch()
-            main_layout.addLayout(button_layout)
-            
-            dialog.setLayout(main_layout)
-            
-            # הגדרת רקע ורוד אדמדם לכל החלון
+            main_layout.addLayout(bottom_layout)
+
+            # עיצוב כללי לדיאלוג (רקע ורוד)
             dialog.setStyleSheet("""
-                QWidget {
-                    background-color: #ffebee;
-                    border: 2px solid #ef5350;
-                    border-radius: 8px;
-                }
+                QDialog { background-color: #ffebee; border: 2px solid #ef5350; }
+                QPushButton { background-color: #f44336; color: white; border: none; border-radius: 5px; padding: 6px 12px; font-weight: bold; }
+                QPushButton:hover { background-color: #d32f2f; }
             """)
-            
-            # הצגת החלון כמודאלי
-            dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-            dialog.show()
-            
-            # המתנה לסגירת החלון
-            dialog.exec() if hasattr(dialog, 'exec') else dialog.show()
-            
-            # שמירת הבחירה אם המשתמש סימן את ה-checkbox
-            if dont_show_checkbox.isChecked():
+
+            # הצגת החלון
+            dialog.exec()
+
+            # שמירת הבחירה
+            if chk_dont_show.isChecked():
                 self.settings.setValue("dont_show_version_53_warning", True)
-                self.log("המשתמש ביקש לא להציג את הודעת גירסה 53 שוב")
-            
+                if hasattr(self, 'log'):
+                    self.log("המשתמש ביקש לא להציג את הודעת גירסה 53 שוב")
+
         except Exception as e:
             print(f"שגיאה בהצגת הודעת גירסה 53: {e}")
-            # לא נרצה שהשגיאה תקרוס את התוכנה, פשוט נדלג על ההודעה
-    
-    def copy_to_clipboard(self, text, parent_widget=None):
-        """העתקת טקסט ללוח"""
-        try:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(text)
-            
-            # הצגת הודעת אישור קצרה
-            if parent_widget:
-                # יצירת label זמני להודעת אישור
-                confirmation = QLabel("✅ הקישור הועתק ללוח!", parent_widget)
-                confirmation.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                confirmation.setStyleSheet("""
-                    QLabel {
-                        background-color: #4CAF50;
-                        color: white;
-                        border-radius: 5px;
-                        padding: 10px;
-                        font-weight: bold;
-                    }
-                """)
-                confirmation.setGeometry(
-                    parent_widget.width() // 2 - 100,
-                    parent_widget.height() - 60,
-                    200,
-                    40
-                )
-                confirmation.show()
-                
-                # הסתרת ההודעה אחרי 2 שניות
-                QTimer.singleShot(2000, confirmation.deleteLater)
-            
-            self.log(f"הועתק ללוח: {text}")
-            
-        except Exception as e:
-            print(f"שגיאה בהעתקה ללוח: {e}")
-    
+
     def handle_state_load_error(self, error_msg):
         """טיפול בשגיאות טעינת מצב"""
         self.log(f"שגיאה בטעינת מצב: {error_msg}")
