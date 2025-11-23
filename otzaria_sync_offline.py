@@ -3794,10 +3794,220 @@ class OtzariaSync(QMainWindow):
         stats_layout.addStretch()
         stats_tab.setLayout(stats_layout)
         
+        # === טאב הוראות והדרכות ===
+        instructions_tab = QWidget()
+        instructions_layout = QVBoxLayout()
+        
+        # יצירת scroll area לתוכן ההדרכות
+        instructions_scroll = QScrollArea()
+        instructions_scroll.setWidgetResizable(True)
+        instructions_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        instructions_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Widget לתוכן ההדרכות
+        instructions_content = QWidget()
+        instructions_content_layout = QVBoxLayout()
+        
+        # תוכן ההדרכות עם HTML ו-CSS
+        instructions_text = QTextEdit()
+        instructions_text.setReadOnly(True)
+        instructions_text.setHtml("""
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                direction: rtl;
+                text-align: right;
+                padding: 20px;
+                background-color: #f9f9f9;
+            }
+            h1 {
+                color: #2E4057;
+                border-bottom: 3px solid #4CAF50;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+                font-size: 28px;
+            }
+            h2 {
+                color: #1976D2;
+                margin-top: 25px;
+                margin-bottom: 15px;
+                font-size: 22px;
+                border-right: 5px solid #2196F3;
+                padding-right: 10px;
+            }
+            h3 {
+                color: #FF9800;
+                margin-top: 20px;
+                margin-bottom: 10px;
+                font-size: 18px;
+            }
+            p {
+                line-height: 1.8;
+                margin-bottom: 15px;
+                font-size: 15px;
+                color: #333;
+            }
+            ul {
+                margin-right: 20px;
+                margin-bottom: 15px;
+            }
+            li {
+                margin-bottom: 10px;
+                line-height: 1.6;
+                font-size: 14px;
+            }
+            .warning {
+                background-color: #FFF3E0;
+                border-right: 5px solid #FF9800;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+            }
+            .tip {
+                background-color: #E8F5E9;
+                border-right: 5px solid #4CAF50;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+            }
+            .important {
+                background-color: #FFEBEE;
+                border-right: 5px solid #F44336;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            .step {
+                background-color: #E3F2FD;
+                padding: 12px;
+                margin: 10px 0;
+                border-radius: 5px;
+                border-right: 4px solid #2196F3;
+            }
+            code {
+                background-color: #f4f4f4;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                color: #d63384;
+            }
+        </style>
+        
+        <h1>📚 מדריך שימוש - תוכנת סנכרון אוצריא אופליין</h1>
+        
+        <div class="important">
+            <h3>⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה</h3>
+            <p>אם יש לך גירסת ספרייה מספר 53 או נמוך מזה, תוכנת הסנכרון אופליין תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.</p>
+            <p><strong>מכיוון שזה לוקח המון זמן, מומלץ מאוד להוריד את המאגר כולו מחדש דרך קובץ הזיפ מכאן:</strong></p>
+            <p><a href="https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip" style="color: #2196F3; font-weight: bold;">https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip</a></p>
+            <p>ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים.</p>
+        </div>
+        
+        <h2>🎯 מהי תוכנת הסנכרון?</h2>
+        <p>תוכנת הסנכרון האופליין של אוצריא מאפשרת לך לעדכן את ספריית אוצריא שלך ללא צורך בחיבור אינטרנט מתמיד. התוכנה מורידה רק את הקבצים החדשים והמעודכנים, וחוסכת זמן ורוחב פס.</p>
+        
+        <h2>📋 שלבי השימוש</h2>
+        
+        <div class="step">
+            <h3>שלב 1: טעינת קבצי נתוני ספרים</h3>
+            <p>לחץ על הכפתור <strong>"טען קבצי נתוני ספרים"</strong> (או השתמש בקיצור <code>Ctrl+S</code>)</p>
+            <ul>
+                <li>התוכנה תחפש אוטומטית את תיקיית אוצריא במחשב שלך</li>
+                <li>אם התיקיה לא נמצאת, תוכל לבחור אותה ידנית</li>
+                <li>התוכנה תטען את קבצי המניפסט (רשימת הספרים והקבצים)</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>שלב 2: הורדת קבצים חדשים ומעודכנים</h3>
+            <p>לחץ על הכפתור <strong>"הורד קבצים חדשים וקבצים שהתעדכנו"</strong></p>
+            <ul>
+                <li>התוכנה תשווה בין הקבצים שלך לבין הגרסה העדכנית ביותר</li>
+                <li>תוריד רק את הקבצים החדשים והמעודכנים</li>
+                <li>תוכל לעקוב אחר ההתקדמות בסרגל ההתקדמות וביומן הפעולות</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>שלב 3: עדכון שינויים למאגר הספרים</h3>
+            <p>לחץ על הכפתור <strong>"עדכן שינויים לתוך מאגר הספרים"</strong></p>
+            <ul>
+                <li>התוכנה תעתיק את הקבצים החדשים לתיקיית אוצריא</li>
+                <li>תמחק קבצים ישנים שכבר לא נחוצים</li>
+                <li>תעדכן את קבצי המניפסט</li>
+            </ul>
+        </div>
+        
+        <h2>⌨️ קיצורי מקלדת</h2>
+        <ul>
+            <li><code>Ctrl+S</code> - טען קבצי נתוני ספרים</li>
+            <li><code>Ctrl+P</code> - השהה/המשך פעולה</li>
+            <li><code>Ctrl+R</code> - איפוס מצב</li>
+            <li><code>Escape</code> - ביטול פעולה</li>
+            <li><code>Ctrl+⬆</code> - הגדלת איזור יומן הפעולות</li>
+            <li><code>Ctrl+⬇</code> - הקטנת איזור יומן הפעולות</li>
+            <li><code>Ctrl+T</code> - החלפת ערכת נושא (בהיר/כהה)</li>
+            <li><code>Ctrl++</code> - הגדלת גופן</li>
+            <li><code>Ctrl+-</code> - הקטנת גופן</li>
+        </ul>
+        
+        <h2>💡 טיפים שימושיים</h2>
+        
+        <div class="tip">
+            <h3>✅ טיפ 1: בדוק את גרסת הספרייה</h3>
+            <p>עבור לטאב <strong>"סטטיסטיקות"</strong> כדי לראות את גרסת הספרייה הנוכחית שלך ומידע נוסף על המאגר.</p>
+        </div>
+        
+        <div class="tip">
+            <h3>✅ טיפ 2: התאם אישית את התוכנה</h3>
+            <p>בטאב <strong>"הגדרות"</strong> תוכל להתאים את ערכת הנושא, גודל הגופן, ומספר חוטי ההורדה לפי העדפותיך.</p>
+        </div>
+        
+        <div class="tip">
+            <h3>✅ טיפ 3: עקוב אחר ההתקדמות</h3>
+            <p>יומן הפעולות מציג מידע מפורט על כל פעולה. אם משהו לא עובד כצפוי, בדוק את היומן לפרטים נוספים.</p>
+        </div>
+        
+        <div class="warning">
+            <h3>⚠️ אזהרה: אל תסגור את התוכנה באמצע פעולה</h3>
+            <p>סגירת התוכנה באמצע הורדה או עדכון עלולה לגרום לבעיות. השתמש בכפתור "בטל" כדי לעצור פעולה בצורה מסודרת.</p>
+        </div>
+        
+        <h2>🔧 פתרון בעיות נפוצות</h2>
+        
+        <h3>❓ התוכנה לא מוצאת את תיקיית אוצריא</h3>
+        <p>לחץ על הכפתור <strong>"בחר תיקיה ידנית"</strong> שמופיע במהלך החיפוש, ובחר את התיקיה הנכונה.</p>
+        
+        <h3>❓ ההורדה איטית מדי</h3>
+        <p>עבור לטאב <strong>"הגדרות"</strong> והגדל את מספר חוטי ההורדה. שים לב שמספר גבוה מדי עלול להעמיס על החיבור שלך.</p>
+        
+        <h3>❓ התוכנה תקועה</h3>
+        <p>לחץ על <strong>"בטל"</strong> או <code>Escape</code>, ולאחר מכן על <strong>"איפוס מצב"</strong> כדי להתחיל מחדש.</p>
+        
+        <h2>📞 צור קשר ותמיכה</h2>
+        <p>אם נתקלת בבעיה או שיש לך שאלה, אנא פנה לתמיכה דרך:</p>
+        <ul>
+            <li>GitHub: <a href="https://github.com/Y-PLONI/otzaria-library" style="color: #2196F3;">https://github.com/Y-PLONI/otzaria-library</a></li>
+            <li>דווח על באג או בקש תכונה חדשה דרך Issues בGitHub</li>
+        </ul>
+        
+        <p style="text-align: center; margin-top: 30px; color: #888; font-size: 13px;">
+            תוכנת סנכרון אוצריא אופליין | גרסה 1.0 | MIT License
+        </p>
+        """)
+        
+        instructions_content_layout.addWidget(instructions_text)
+        instructions_content.setLayout(instructions_content_layout)
+        instructions_scroll.setWidget(instructions_content)
+        instructions_layout.addWidget(instructions_scroll)
+        instructions_tab.setLayout(instructions_layout)
+        
         # הוספת טאבים
         self.tab_widget.addTab(sync_tab, "🔄 סנכרון")
         self.tab_widget.addTab(settings_tab, "⚙️ הגדרות")
         self.tab_widget.addTab(stats_tab, "📊 סטטיסטיקות")
+        self.tab_widget.addTab(instructions_tab, "📖 הוראות והדרכות")
         
         main_layout.addWidget(self.tab_widget)
         central_widget.setLayout(main_layout)
@@ -4185,11 +4395,16 @@ class OtzariaSync(QMainWindow):
             # החלת סגנונות כפתורים אחרי שכל הנושא נטען
             QTimer.singleShot(200, lambda: self._apply_all_button_styles())
             
+            # הצגת הודעת גירסה 53 אם לא נבחר "אל תזכיר עוד פעם"
+            QTimer.singleShot(500, self.show_version_53_warning)
+            
         except Exception as e:
             print(f"שגיאה בהחלת הגדרות ראשוניות: {e}")
             self.apply_theme_fallback()
             # החלת סגנונות כפתורים גם במקרה של שגיאה
             QTimer.singleShot(200, lambda: self._apply_all_button_styles())
+            # הצגת הודעה גם במקרה של שגיאה
+            QTimer.singleShot(500, self.show_version_53_warning)
     
     def refresh_theme(self):
         """רענון ערכת נושא - לשימוש לאחר תיקונים"""
@@ -4731,6 +4946,210 @@ class OtzariaSync(QMainWindow):
         """הצגת הודעת הצלחה למשתמש"""
         QMessageBox.information(self, title, message)
         self.log(f"הצלחה: {message}")
+    
+    def show_version_53_warning(self):
+        """הצגת הודעת אזהרה לגירסת ספרייה 53 ומטה"""
+        try:
+            # בדיקה אם המשתמש ביקש לא להציג את ההודעה שוב
+            dont_show_again = self.settings.value("dont_show_version_53_warning", False, type=bool)
+            
+            if dont_show_again:
+                return
+            
+            # יצירת חלון דיאלוג מותאם אישית במקום QMessageBox
+            dialog = QWidget(self, Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
+            dialog.setWindowTitle("⚠️ הודעה חשובה")
+            dialog.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+            dialog.setMinimumWidth(600)
+            
+            # Layout ראשי
+            main_layout = QVBoxLayout()
+            main_layout.setSpacing(15)
+            main_layout.setContentsMargins(20, 20, 20, 20)
+            
+            # כותרת
+            title_label = QLabel("⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה")
+            title_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            title_font = QFont()
+            title_font.setPointSize(14)
+            title_font.setBold(True)
+            title_label.setFont(title_font)
+            title_label.setStyleSheet("color: #d32f2f; padding: 10px;")
+            title_label.setWordWrap(True)
+            main_layout.addWidget(title_label)
+            
+            # תוכן ההודעה
+            content_label = QLabel(
+                "אם יש לך <b>גירסת ספרייה מספר 53 או נמוך מזה</b>, תוכנת הסנכרון אופליין "
+                "תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.<br><br>"
+                "<b>מכיוון שזה לוקח המון זמן</b>, מומלץ מאוד להוריד את המאגר כולו מחדש "
+                "דרך קובץ הזיפ ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים."
+            )
+            content_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            content_label.setWordWrap(True)
+            content_label.setStyleSheet("color: #333; line-height: 1.6; padding: 10px; font-size: 13px;")
+            main_layout.addWidget(content_label)
+            
+            # מסגרת לקישור עם כפתור העתקה
+            link_frame = QFrame()
+            link_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #e3f2fd;
+                    border: 1px solid #90caf9;
+                    border-radius: 5px;
+                    padding: 10px;
+                }
+            """)
+            link_layout = QHBoxLayout()
+            link_layout.setSpacing(10)
+            
+            # הקישור
+            zip_url = "https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip"
+            link_label = QLabel(f'<a href="{zip_url}" style="color: #1976d2; font-weight: bold; text-decoration: none;">{zip_url}</a>')
+            link_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            link_label.setOpenExternalLinks(True)
+            link_label.setWordWrap(True)
+            link_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+            link_label.setStyleSheet("padding: 5px; font-size: 12px;")
+            
+            # כפתור העתקה
+            copy_button = QPushButton("📋 העתק קישור")
+            copy_button.setToolTip("העתק את הקישור ללוח")
+            copy_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #1976d2;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 8px 16px;
+                    font-weight: bold;
+                    min-width: 120px;
+                }
+                QPushButton:hover {
+                    background-color: #1565c0;
+                }
+                QPushButton:pressed {
+                    background-color: #0d47a1;
+                }
+            """)
+            copy_button.clicked.connect(lambda: self.copy_to_clipboard(zip_url, dialog))
+            
+            link_layout.addWidget(copy_button)
+            link_layout.addWidget(link_label, 1)
+            link_frame.setLayout(link_layout)
+            main_layout.addWidget(link_frame)
+            
+            # Checkbox "אל תזכיר עוד פעם"
+            dont_show_checkbox = QCheckBox("אל תזכיר לי עוד פעם")
+            dont_show_checkbox.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+            dont_show_checkbox.setStyleSheet("""
+                QCheckBox {
+                    color: #333;
+                    font-weight: bold;
+                    spacing: 8px;
+                    padding: 10px;
+                }
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #f44336;
+                    border-radius: 3px;
+                    background-color: white;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #f44336;
+                }
+            """)
+            main_layout.addWidget(dont_show_checkbox, alignment=Qt.AlignmentFlag.AlignRight)
+            
+            # כפתור סגירה
+            button_layout = QHBoxLayout()
+            close_button = QPushButton("סגור")
+            close_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #f44336;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 10px 30px;
+                    font-weight: bold;
+                    min-width: 100px;
+                }
+                QPushButton:hover {
+                    background-color: #d32f2f;
+                }
+                QPushButton:pressed {
+                    background-color: #c62828;
+                }
+            """)
+            close_button.clicked.connect(dialog.close)
+            button_layout.addStretch()
+            button_layout.addWidget(close_button)
+            button_layout.addStretch()
+            main_layout.addLayout(button_layout)
+            
+            dialog.setLayout(main_layout)
+            
+            # הגדרת רקע ורוד אדמדם לכל החלון
+            dialog.setStyleSheet("""
+                QWidget {
+                    background-color: #ffebee;
+                    border: 2px solid #ef5350;
+                    border-radius: 8px;
+                }
+            """)
+            
+            # הצגת החלון כמודאלי
+            dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+            dialog.show()
+            
+            # המתנה לסגירת החלון
+            dialog.exec() if hasattr(dialog, 'exec') else dialog.show()
+            
+            # שמירת הבחירה אם המשתמש סימן את ה-checkbox
+            if dont_show_checkbox.isChecked():
+                self.settings.setValue("dont_show_version_53_warning", True)
+                self.log("המשתמש ביקש לא להציג את הודעת גירסה 53 שוב")
+            
+        except Exception as e:
+            print(f"שגיאה בהצגת הודעת גירסה 53: {e}")
+            # לא נרצה שהשגיאה תקרוס את התוכנה, פשוט נדלג על ההודעה
+    
+    def copy_to_clipboard(self, text, parent_widget=None):
+        """העתקת טקסט ללוח"""
+        try:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # הצגת הודעת אישור קצרה
+            if parent_widget:
+                # יצירת label זמני להודעת אישור
+                confirmation = QLabel("✅ הקישור הועתק ללוח!", parent_widget)
+                confirmation.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                confirmation.setStyleSheet("""
+                    QLabel {
+                        background-color: #4CAF50;
+                        color: white;
+                        border-radius: 5px;
+                        padding: 10px;
+                        font-weight: bold;
+                    }
+                """)
+                confirmation.setGeometry(
+                    parent_widget.width() // 2 - 100,
+                    parent_widget.height() - 60,
+                    200,
+                    40
+                )
+                confirmation.show()
+                
+                # הסתרת ההודעה אחרי 2 שניות
+                QTimer.singleShot(2000, confirmation.deleteLater)
+            
+            self.log(f"הועתק ללוח: {text}")
+            
+        except Exception as e:
+            print(f"שגיאה בהעתקה ללוח: {e}")
     
     def handle_state_load_error(self, error_msg):
         """טיפול בשגיאות טעינת מצב"""
