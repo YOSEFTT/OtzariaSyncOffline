@@ -4952,7 +4952,8 @@ class OtzariaSync(QMainWindow):
         """הצגת הודעת אזהרה לגירסת ספרייה 53 ומטה"""
         try:
             # בדיקה אם המשתמש ביקש לא להציג את ההודעה שוב
-            dont_show_again = self.settings.value("dont_show_version_53_warning", False, type=bool)
+            # קודם בודקים בקובץ המקומי, אחר כך ב-QSettings
+            dont_show_again = self.get_dont_show_warning_setting()
             if dont_show_again:
                 return
 
@@ -5049,12 +5050,45 @@ class OtzariaSync(QMainWindow):
 
             # שמירת הבחירה
             if chk_dont_show.isChecked():
-                self.settings.setValue("dont_show_version_53_warning", True)
+                self.save_dont_show_warning_setting(True)
                 if hasattr(self, 'log'):
                     self.log("המשתמש ביקש לא להציג את הודעת גירסה 53 שוב")
 
         except Exception as e:
             print(f"שגיאה בהצגת הודעת גירסה 53: {e}")
+    
+    def get_dont_show_warning_setting(self):
+        """קריאת הגדרת 'אל תזכיר עוד פעם' מקובץ מקומי ו-QSettings"""
+        try:
+            # קודם מנסים לקרוא מהקובץ המקומי
+            state = self.state_manager.load_state()
+            if "dont_show_version_53_warning" in state:
+                return state.get("dont_show_version_53_warning", False)
+            
+            # אם לא נמצא בקובץ, בודקים ב-QSettings (לתאימות לאחור)
+            return self.settings.value("dont_show_version_53_warning", False, type=bool)
+            
+        except Exception as e:
+            print(f"שגיאה בקריאת הגדרת אזהרה: {e}")
+            return False
+    
+    def save_dont_show_warning_setting(self, value):
+        """שמירת הגדרת 'אל תזכיר עוד פעם' בקובץ מקומי וב-QSettings"""
+        try:
+            # שמירה ב-QSettings (לתאימות לאחור)
+            self.settings.setValue("dont_show_version_53_warning", value)
+            
+            # שמירה בקובץ המקומי
+            state = self.state_manager.load_state()
+            state["dont_show_version_53_warning"] = value
+            self.state_manager.save_state(state)
+            
+            print(f"הגדרת 'אל תזכיר עוד פעם' נשמרה: {value}")
+            return True
+            
+        except Exception as e:
+            print(f"שגיאה בשמירת הגדרת אזהרה: {e}")
+            return False
 
     def handle_state_load_error(self, error_msg):
         """טיפול בשגיאות טעינת מצב"""
