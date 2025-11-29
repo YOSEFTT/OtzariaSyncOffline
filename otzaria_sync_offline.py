@@ -1715,6 +1715,7 @@ class WorkerThread(QThread):
         pixmap = QPixmap()
         pixmap.loadFromData(base64.b64decode(icon_base64))
         return QIcon(pixmap)
+        
 class AnimatedButton(QPushButton):
     """כפתור עם אנימציות חלקות משופרות
     
@@ -3906,7 +3907,8 @@ class OtzariaSync(QMainWindow):
         </div>
         
         <h2>🎯 מהי תוכנת הסנכרון?</h2>
-        <p>תוכנת הסנכרון האופליין של אוצריא מאפשרת לך לעדכן את ספריית אוצריא שלך ללא צורך בחיבור אינטרנט מתמיד. התוכנה מורידה רק את הקבצים החדשים והמעודכנים, וחוסכת זמן ורוחב פס.</p>
+        <p>תוכנת הסנכרון האופליין של אוצריא מאפשרת לך לעדכן את ספריית אוצריא שלך ללא צורך לחבר את המחשב שלך לרשת האינטרנט.<br>
+        התוכנה מורידה את הקבצים החדשים והמעודכנים בלבד, וחוסכת זמן ורוחב פס.</p>
         
         <h2>📋 שלבי השימוש</h2>
         
@@ -3984,17 +3986,17 @@ class OtzariaSync(QMainWindow):
         <p>עבור לטאב <strong>"הגדרות"</strong> והגדל את מספר חוטי ההורדה. שים לב שמספר גבוה מדי עלול להעמיס על החיבור שלך.</p>
         
         <h3>❓ התוכנה תקועה</h3>
-        <p>לחץ על <strong>"בטל"</strong> או <code>Escape</code>, ולאחר מכן על <strong>"איפוס מצב"</strong> כדי להתחיל מחדש.</p>
+        <p>לחץ על כפתור <strong>"בטל"</strong> או על מקש <code>Escape</code>, ולאחר מכן על <strong>"איפוס מצב"</strong> כדי להתחיל מחדש.</p>
         
         <h2>📞 צור קשר ותמיכה</h2>
         <p>אם נתקלת בבעיה או שיש לך שאלה, אנא פנה לתמיכה דרך:</p>
         <ul>
-            <li>GitHub: <a href="https://github.com/Y-PLONI/otzaria-library" style="color: #2196F3;">https://github.com/Y-PLONI/otzaria-library</a></li>
-            <li>דווח על באג או בקש תכונה חדשה דרך Issues בGitHub</li>
+            <li>פתיחת Issues בגיטהאב, בכתובת: <a href="https://github.com/YOSEFTT/OtzariaSyncOffline/issues" style="color: #2196F3;">https://github.com/YOSEFTT/OtzariaSyncOffline/issues</a></li>
+            <li>שליחת מייל, לכתובת: <a href="https://mail.google.com/mail/u/0/?view=cm&fs=1&to=otzaria.1%40gmail.com%E2%80%AC">otzaria.1@gmail.com</a></li>
         </ul>
         
         <p style="text-align: center; margin-top: 30px; color: #888; font-size: 13px;">
-            תוכנת סנכרון אוצריא אופליין | גרסה 1.0 | MIT License
+            תוכנת סנכרון אוצריא אופליין | גרסה 3.1 | MIT License
         </p>
         """)
         
