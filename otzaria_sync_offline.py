@@ -3826,6 +3826,7 @@ class OtzariaSync(QMainWindow):
                 color: #2E4057;
                 border-bottom: 3px solid #4CAF50;
                 padding-bottom: 10px;
+                margin-top: 20px;
                 margin-bottom: 20px;
                 font-size: 28px;
             }
@@ -3837,111 +3838,154 @@ class OtzariaSync(QMainWindow):
                 border-right: 5px solid #2196F3;
                 padding-right: 10px;
             }
-            h3 {
+            /* עיצוב כותרות בתוך הטבלאות */
+            td h3 {
                 color: #FF9800;
-                margin-top: 20px;
-                margin-bottom: 10px;
+                margin-top: 0;
+                margin-bottom: 5px;
                 font-size: 18px;
             }
+            /* צבע כותרת שונה בתוך ההודעה האדומה */
+            .red-box h3 {
+                color: #D32F2F; 
+                text-align: center;
+            }
+            /* צבע כותרת בתוך השלבים */
+            .blue-box h3 {
+                color: #1565C0;
+            }
             p {
-                line-height: 1.8;
-                margin-bottom: 15px;
+                line-height: 1.6;
+                margin-bottom: 10px;
                 font-size: 15px;
                 color: #333;
             }
             ul {
-                margin-right: 20px;
-                margin-bottom: 15px;
+                margin-top: 0;
+                margin-bottom: 10px;
             }
             li {
-                margin-bottom: 10px;
-                line-height: 1.6;
-                font-size: 14px;
-            }
-            .warning {
-                background-color: #FFF3E0;
-                border-right: 5px solid #FF9800;
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 5px;
-            }
-            .tip {
-                background-color: #E8F5E9;
-                border-right: 5px solid #4CAF50;
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 5px;
-            }
-            .important {
-                background-color: #FFEBEE;
-                border-right: 5px solid #F44336;
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 5px;
-                font-weight: bold;
-            }
-            .step {
-                background-color: #E3F2FD;
-                padding: 12px;
-                margin: 10px 0;
-                border-radius: 5px;
-                border-right: 4px solid #2196F3;
+                margin-bottom: 5px;
             }
             code {
-                background-color: #f4f4f4;
+                background-color: #f0f0f0;
                 padding: 2px 6px;
-                border-radius: 3px;
                 font-family: 'Courier New', monospace;
+                font-size: 13px;
                 color: #d63384;
             }
+            a {
+                color: #2196F3;
+                text-decoration: none;
+                font-weight: bold;
+            }
+            /* מחלקות עזר לטבלאות */
+            .tips-table {
+                margin-top: 15px;
+                margin-bottom: 15px;
+            }
+            td.red-box {
+                text-align: center;
+            }
+
+            td.red-box h3 {
+                color: #D32F2F;
+            }                                  
         </style>
-        
+        <p></p>
         <h1>📚 מדריך שימוש - תוכנת סנכרון אוצריא אופליין</h1>
-        
-        <div class="important">
-            <h3>⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה</h3>
-            <p>אם יש לך גירסת ספרייה מספר 53 או נמוך מזה, תוכנת הסנכרון אופליין תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.</p>
-            <p><strong>מכיוון שזה לוקח המון זמן, מומלץ מאוד להוריד את המאגר כולו מחדש דרך קובץ הזיפ מכאן:</strong></p>
-            <p><a href="https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip" style="color: #2196F3; font-weight: bold;">https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip</a></p>
-            <p>ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים.</p>
-        </div>
+        <p></p>
+        <!-- הודעה חשובה - בתוך טבלה כדי להבטיח רצף צבע -->
+        <table width="100%" bgcolor="#FFEBEE" border="0" cellpadding="15" cellspacing="0" style="margin-bottom: 20px; border-right: 6px solid #F44336;">
+            <tr>
+                <td class="red-box">
+                    <h3>⚠️ הודעה חשובה למשתמשים עם גירסת ספרייה 53 ומטה</h3>
+                    <p>אם יש לך גירסת ספרייה מספר 53 או נמוך מזה, תוכנת הסנכרון אופליין תצטרך להוריד את כל המאגר כולו מחדש עקב שינויים במבנה הספרייה באתר.</p>
+                    <p><strong>מכיוון שזה לוקח המון זמן, מומלץ מאוד להוריד את המאגר כולו מחדש דרך קובץ הזיפ מכאן:</strong>
+                    <br><a href="https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip">https://github.com/Y-PLONI/otzaria-library/releases/download/latest/otzaria_latest.zip</a>
+                    <br>ולהשתמש בתוכנה זו רק בשביל הסנכרונים הבאים</p>
+                </td>
+            </tr>
+        </table>
         
         <h2>🎯 מהי תוכנת הסנכרון?</h2>
         <p>תוכנת הסנכרון האופליין של אוצריא מאפשרת לך לעדכן את ספריית אוצריא שלך ללא צורך לחבר את המחשב שלך לרשת האינטרנט.<br>
-        התוכנה מורידה את הקבצים החדשים והמעודכנים בלבד, וחוסכת זמן ורוחב פס.</p>
+        התוכנה מורידה את הקבצים החדשים והמעודכנים בלבד, וחוסכת לך זמן יקר, וכן ניצול חבילת הגלישה.</p>
         
         <h2>📋 שלבי השימוש</h2>
         
-        <div class="step">
-            <h3>שלב 1: טעינת קבצי נתוני ספרים</h3>
-            <p>לחץ על הכפתור <strong>"טען קבצי נתוני ספרים"</strong> (או השתמש בקיצור <code>Ctrl+S</code>)</p>
-            <ul>
-                <li>התוכנה תחפש אוטומטית את תיקיית אוצריא במחשב שלך</li>
-                <li>אם התיקיה לא נמצאת, תוכל לבחור אותה ידנית</li>
-                <li>התוכנה תטען את קבצי המניפסט (רשימת הספרים והקבצים)</li>
-            </ul>
-        </div>
+        <!-- שלבי השימוש - כולם בתוך טבלה אחת גדולה -->
+        <table width="100%" bgcolor="#E3F2FD" border="0" cellpadding="15" cellspacing="0" style="margin-bottom: 20px; border-right: 6px solid #2196F3;">
+            <tr>
+                <td class="blue-box">
+                    <!-- שלב 1 -->
+                    <div style="margin-bottom: 20px;">
+                        <h3>שלב 1: טעינת קבצי נתוני ספרים</h3>
+                        <p>לחץ על הכפתור <strong>"טען קבצי נתוני ספרים"</strong> (או השתמש בקיצור <code>Ctrl+S</code>)</p>
+                        <ul>
+                            <li>התוכנה תחפש אוטומטית את תיקיית אוצריא במחשב שלך</li>
+                            <li>אם התיקיה לא נמצאת, תוכל לבחור אותה ידנית</li>
+                            <li>התוכנה תטען את קבצי המניפסט (רשימת הספרים והקבצים)</li>
+                        </ul>
+                    </div>
+
+                    <!-- שלב 2 -->
+                    <div style="margin-bottom: 20px;">
+                        <h3>שלב 2: הורדת קבצים חדשים ומעודכנים</h3>
+                        <p>לחץ על הכפתור <strong>"הורד קבצים חדשים וקבצים שהתעדכנו"</strong></p>
+                        <ul>
+                            <li>התוכנה תשווה בין הקבצים שלך לבין הגרסה העדכנית ביותר</li>
+                            <li>תוריד רק את הקבצים החדשים והמעודכנים</li>
+                            <li>תוכל לעקוב אחר ההתקדמות בסרגל ההתקדמות וביומן הפעולות</li>
+                        </ul>
+                    </div>
+
+                    <!-- שלב 3 -->
+                    <div style="margin-bottom: 0;">
+                        <h3>שלב 3: עדכון שינויים למאגר הספרים</h3>
+                        <p>לחץ על הכפתור <strong>"עדכן שינויים לתוך מאגר הספרים"</strong></p>
+                        <ul>
+                            <li>התוכנה תעתיק את הקבצים החדשים לתיקיית אוצריא</li>
+                            <li>תמחק קבצים ישנים שכבר לא נחוצים</li>
+                            <li>תעדכן את קבצי המניפסט</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        </table>
         
-        <div class="step">
-            <h3>שלב 2: הורדת קבצים חדשים ומעודכנים</h3>
-            <p>לחץ על הכפתור <strong>"הורד קבצים חדשים וקבצים שהתעדכנו"</strong></p>
-            <ul>
-                <li>התוכנה תשווה בין הקבצים שלך לבין הגרסה העדכנית ביותר</li>
-                <li>תוריד רק את הקבצים החדשים והמעודכנים</li>
-                <li>תוכל לעקוב אחר ההתקדמות בסרגל ההתקדמות וביומן הפעולות</li>
-            </ul>
-        </div>
+        <h2>💡 טיפים שימושיים</h2>
         
-        <div class="step">
-            <h3>שלב 3: עדכון שינויים למאגר הספרים</h3>
-            <p>לחץ על הכפתור <strong>"עדכן שינויים לתוך מאגר הספרים"</strong></p>
-            <ul>
-                <li>התוכנה תעתיק את הקבצים החדשים לתיקיית אוצריא</li>
-                <li>תמחק קבצים ישנים שכבר לא נחוצים</li>
-                <li>תעדכן את קבצי המניפסט</li>
-            </ul>
-        </div>
+        <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
+            <tr><td>
+                <h3 style="color: #2E7D32;">✅ טיפ 1: בדוק את גרסת הספרייה</h3>
+                <p style="margin-bottom: 0;">פתח את <strong>"אודות"</strong> שבתוך תוכנת <strong>אוצריא</strong>, כדי לראות את גרסת הספרייה הנוכחית שלך. באם המידע לא קיים שם, תוכל לפתוח דרך סייר הקבצים את הקובץ בשם 'גרסת ספרייה' שנמצא בתיקיית 'אודות התוכנה'.</p>
+            </td></tr>
+        </table>
         
+        <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
+            <tr><td>
+                <h3 style="color: #2E7D32;">✅ טיפ 2: התאם אישית את התוכנה</h3>
+                <p style="margin-bottom: 0;">בטאב <strong>"הגדרות"</strong> תוכל להתאים את ערכת הנושא, וגודל הגופן, לפי העדפותיך.</p>
+            </td></tr>
+        </table>
+        
+        <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
+            <tr><td>
+                <h3 style="color: #2E7D32;">✅ טיפ 3: עקוב אחר ההתקדמות</h3>
+                <p style="margin-bottom: 0;">יומן הפעולות מציג מידע מפורט על כל פעולה. אם משהו לא עובד כצפוי, בדוק את היומן לפרטים נוספים.
+                <br>נסה לפתור את התקלה לפי ההדרכות ב 'פתרון בעיות נפוצות'.<br>
+                אם לא הסתדרת בעצמך, תוכל לשלוח אלינו את פירוט התקלה, בדרכים שמופיעים ב 'צור קשר ותמיכה'.</p>
+            </td></tr>
+        </table>
+        
+        <table width="100%" bgcolor="#FFF3E0" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #FF9800;">
+            <tr><td>
+                <h3 style="color: #E65100;">⚠️ אזהרה: אל תסגור את התוכנה באמצע פעולה</h3>
+                <p style="margin-bottom: 0;">סגירת התוכנה באמצע הורדה או עדכון עלולה לגרום לבעיות. השתמש בכפתור "בטל" כדי לעצור פעולה בצורה מסודרת.</p>
+            </td></tr>
+        </table>
+               
         <h2>⌨️ קיצורי מקלדת</h2>
         <ul>
             <li><code>Ctrl+S</code> - טען קבצי נתוני ספרים</li>
@@ -3954,36 +3998,11 @@ class OtzariaSync(QMainWindow):
             <li><code>Ctrl++</code> - הגדלת גופן</li>
             <li><code>Ctrl+-</code> - הקטנת גופן</li>
         </ul>
-        
-        <h2>💡 טיפים שימושיים</h2>
-        
-        <div class="tip">
-            <h3>✅ טיפ 1: בדוק את גרסת הספרייה</h3>
-            <p>עבור לטאב <strong>"סטטיסטיקות"</strong> כדי לראות את גרסת הספרייה הנוכחית שלך ומידע נוסף על המאגר.</p>
-        </div>
-        
-        <div class="tip">
-            <h3>✅ טיפ 2: התאם אישית את התוכנה</h3>
-            <p>בטאב <strong>"הגדרות"</strong> תוכל להתאים את ערכת הנושא, גודל הגופן, ומספר חוטי ההורדה לפי העדפותיך.</p>
-        </div>
-        
-        <div class="tip">
-            <h3>✅ טיפ 3: עקוב אחר ההתקדמות</h3>
-            <p>יומן הפעולות מציג מידע מפורט על כל פעולה. אם משהו לא עובד כצפוי, בדוק את היומן לפרטים נוספים.</p>
-        </div>
-        
-        <div class="warning">
-            <h3>⚠️ אזהרה: אל תסגור את התוכנה באמצע פעולה</h3>
-            <p>סגירת התוכנה באמצע הורדה או עדכון עלולה לגרום לבעיות. השתמש בכפתור "בטל" כדי לעצור פעולה בצורה מסודרת.</p>
-        </div>
-        
-        <h2>🔧 פתרון בעיות נפוצות</h2>
+                                                                                           
+        <h2>🔧 פתרון בעיות</h2>
         
         <h3>❓ התוכנה לא מוצאת את תיקיית אוצריא</h3>
         <p>לחץ על הכפתור <strong>"בחר תיקיה ידנית"</strong> שמופיע במהלך החיפוש, ובחר את התיקיה הנכונה.</p>
-        
-        <h3>❓ ההורדה איטית מדי</h3>
-        <p>עבור לטאב <strong>"הגדרות"</strong> והגדל את מספר חוטי ההורדה. שים לב שמספר גבוה מדי עלול להעמיס על החיבור שלך.</p>
         
         <h3>❓ התוכנה תקועה</h3>
         <p>לחץ על כפתור <strong>"בטל"</strong> או על מקש <code>Escape</code>, ולאחר מכן על <strong>"איפוס מצב"</strong> כדי להתחיל מחדש.</p>
@@ -3991,7 +4010,7 @@ class OtzariaSync(QMainWindow):
         <h2>📞 צור קשר ותמיכה</h2>
         <p>אם נתקלת בבעיה או שיש לך שאלה, אנא פנה לתמיכה דרך:</p>
         <ul>
-            <li>פתיחת Issues בגיטהאב, בכתובת: <a href="https://github.com/YOSEFTT/OtzariaSyncOffline/issues" style="color: #2196F3;">https://github.com/YOSEFTT/OtzariaSyncOffline/issues</a></li>
+            <li>פתיחת Issues בגיטהאב, בכתובת: <a href="https://github.com/YOSEFTT/OtzariaSyncOffline/issues">https://github.com/YOSEFTT/OtzariaSyncOffline/issues</a></li>
             <li>שליחת מייל, לכתובת: <a href="https://mail.google.com/mail/u/0/?view=cm&fs=1&to=otzaria.1%40gmail.com%E2%80%AC">otzaria.1@gmail.com</a></li>
         </ul>
         
