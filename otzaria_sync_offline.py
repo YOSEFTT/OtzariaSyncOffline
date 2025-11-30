@@ -3958,21 +3958,37 @@ class OtzariaSync(QMainWindow):
         
         <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
             <tr><td>
-                <h3 style="color: #2E7D32;">✅ טיפ 1: בדוק את גרסת הספרייה</h3>
+                <h3 style="color: #2E7D32;">✅ טיפ 1: הכנס את קובץ התוכנה [הזאת] לתיקייה נפרדת</h3>
+                <p style="margin-bottom: 0;"><strong>מומלץ מאוד!!</strong> להכניס את התוכנה לאחר ההורדה [לפני התחלת הסנכרון] לתיקיי' בפני עצמה, כי היא יוצרת הרבה קבצים במיקום שלה, וזה יכול לגרום לכם לבלגן.
+                <br>אם לא עשיתם את זה עדיין, תוכלו עכשיו לסגור את התוכנה, ולהעביר אותה למיקום אחר, ואחר כך להפעיל אותה שוב.</p>
+                <br>אם לא עשיתם את זה עדיין, תוכלו עכשיו לסגור את התוכנה, ולהעביר אותה למיקום אחר, ואחר כך להפעיל אותה שוב.</p>
+            </td></tr>
+        </table>
+        
+        <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
+            <tr><td>
+                <h3 style="color: #2E7D32;">✅ טיפ 2: הכנס את התוכנה לכונן נייד</h3>
+                <p style="margin-bottom: 0;">הכנס את התוכנה לכונן נשלף, כמו דיסק אונקי או כרטיס זיכרון וכדו', כדי שתוכל להעבירה אח"כ בקלות לחדר המחשבים.</p>
+            </td></tr>
+        </table>
+                                          
+        <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
+            <tr><td>
+                <h3 style="color: #2E7D32;">✅ טיפ 3: בדוק את גרסת הספרייה</h3>
                 <p style="margin-bottom: 0;">פתח את <strong>"אודות"</strong> שבתוך תוכנת <strong>אוצריא</strong>, כדי לראות את גרסת הספרייה הנוכחית שלך. באם המידע לא קיים שם, תוכל לפתוח דרך סייר הקבצים את הקובץ בשם 'גרסת ספרייה' שנמצא בתיקיית 'אודות התוכנה'.</p>
             </td></tr>
         </table>
         
         <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
             <tr><td>
-                <h3 style="color: #2E7D32;">✅ טיפ 2: התאם אישית את התוכנה</h3>
+                <h3 style="color: #2E7D32;">✅ טיפ 4: התאם אישית את התוכנה</h3>
                 <p style="margin-bottom: 0;">בטאב <strong>"הגדרות"</strong> תוכל להתאים את ערכת הנושא, וגודל הגופן, לפי העדפותיך.</p>
             </td></tr>
         </table>
         
         <table width="100%" bgcolor="#E8F5E9" border="0" cellpadding="10" cellspacing="0" class="tips-table" style="border-right: 5px solid #4CAF50;">
             <tr><td>
-                <h3 style="color: #2E7D32;">✅ טיפ 3: עקוב אחר ההתקדמות</h3>
+                <h3 style="color: #2E7D32;">✅ טיפ 5: עקוב אחר ההתקדמות</h3>
                 <p style="margin-bottom: 0;">יומן הפעולות מציג מידע מפורט על כל פעולה. אם משהו לא עובד כצפוי, בדוק את היומן לפרטים נוספים.
                 <br>נסה לפתור את התקלה לפי ההדרכות ב 'פתרון בעיות נפוצות'.<br>
                 אם לא הסתדרת בעצמך, תוכל לשלוח אלינו את פירוט התקלה, בדרכים שמופיעים ב 'צור קשר ותמיכה'.</p>
@@ -3988,6 +4004,8 @@ class OtzariaSync(QMainWindow):
                
         <h2>⌨️ קיצורי מקלדת</h2>
         <ul>
+            <li><code>Ctrl+I</code> - הצגת מידע על האפליקציה</li>
+            <li><code>F1</code> - הצגת עזרה וקיצורי מקלדת</li>
             <li><code>Ctrl+S</code> - טען קבצי נתוני ספרים</li>
             <li><code>Ctrl+P</code> - השהה/המשך פעולה</li>
             <li><code>Ctrl+R</code> - איפוס מצב</li>
@@ -3997,6 +4015,18 @@ class OtzariaSync(QMainWindow):
             <li><code>Ctrl+T</code> - החלפת ערכת נושא (בהיר/כהה)</li>
             <li><code>Ctrl++</code> - הגדלת גופן</li>
             <li><code>Ctrl+-</code> - הקטנת גופן</li>
+            <li><code>Ctrl+1</code> - מעבר לטאב סנכרון</li>
+            <li><code>Ctrl+2</code> - מעבר לטאב הגדרות</li>
+            <li><code>Ctrl+3</code> - מעבר לטאב סטטיסטיקות</li>
+            <li><code>Space</code> - השהה/המשך פעולה</li>
+            <li><code>Ctrl+Shift+R</code> - רענון ערכת נושא</li>
+            <li><code>Alt+1</code> - שלב ראשון (טעינת קבצי נתונים)</li>
+            <li><code>Alt+2</code> - שלב שני (הורדת עדכונים)</li>
+            <li><code>Alt+3</code> - שלב שלישי (החלת עדכונים)</li>
+            <li><code>Ctrl+Q</code> - יציאה</li>
+            <li><code>Ctrl+O</code> - פתיחת דיאלוג בחירת תיקיה</li>
+            <li><code>Ctrl+0</code> - איפוס גודל גופן לברירת מחדל</li>
+            <li><code>Ctrl+E</code> - ייצוא סטטיסטיקות</li>
         </ul>
                                                                                            
         <h2>🔧 פתרון בעיות</h2>
