@@ -85,6 +85,55 @@ def detect_file_encoding(file_path):
     except Exception:
         return 'utf-8'
 
+def hebrew_question_dialog(parent, title, text, default_no=False):
+    """דיאלוג שאלה עם כפתורים בעברית (כן/לא)"""
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setIcon(QMessageBox.Icon.Question)
+    
+    # יצירת כפתורים בעברית
+    btn_yes = msg_box.addButton("כן", QMessageBox.ButtonRole.YesRole)
+    btn_no = msg_box.addButton("לא", QMessageBox.ButtonRole.NoRole)
+    
+    # הגדרת כפתור ברירת מחדל
+    if default_no:
+        msg_box.setDefaultButton(btn_no)
+    else:
+        msg_box.setDefaultButton(btn_yes)
+    
+    msg_box.exec()
+    
+    # החזרת True אם נלחץ "כן"
+    return msg_box.clickedButton() == btn_yes
+
+def hebrew_info_dialog(parent, title, text):
+    """דיאלוג מידע עם כפתור אישור בעברית"""
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setIcon(QMessageBox.Icon.Information)
+    msg_box.addButton("אישור", QMessageBox.ButtonRole.AcceptRole)
+    msg_box.exec()
+
+def hebrew_warning_dialog(parent, title, text):
+    """דיאלוג אזהרה עם כפתור אישור בעברית"""
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setIcon(QMessageBox.Icon.Warning)
+    msg_box.addButton("אישור", QMessageBox.ButtonRole.AcceptRole)
+    msg_box.exec()
+
+def hebrew_error_dialog(parent, title, text):
+    """דיאלוג שגיאה עם כפתור אישור בעברית"""
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setIcon(QMessageBox.Icon.Critical)
+    msg_box.addButton("אישור", QMessageBox.ButtonRole.AcceptRole)
+    msg_box.exec()
+
 BASE_URL = "https://raw.githubusercontent.com/Y-PLONI/otzaria-library/refs/heads/main/"
 BASE_PATH = "אוצריא"
 LOCAL_PATH = ""
@@ -3248,7 +3297,7 @@ class ShortcutManager:
     def _show_info(self):
         """הצגת מידע על האפליקציה"""
         try:
-            QMessageBox.information(
+            hebrew_info_dialog(
                 self.main_window,
                 "אודות אוצריא - סנכרון אופליין",
                 "אוצריא - סנכרון אופליין\n"
@@ -4391,14 +4440,11 @@ class OtzariaSync(QMainWindow):
     def reset_all_settings(self):
         """איפוס כל ההגדרות לברירת מחדל"""
         try:
-            reply = QMessageBox.question(
+            if hebrew_question_dialog(
                 self,
                 "איפוס הגדרות",
-                "האם אתה בטוח שברצונך לאפס את כל ההגדרות לברירת מחדל?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
+                "האם אתה בטוח שברצונך לאפס את כל ההגדרות לברירת מחדל?"
+            ):
                 # איפוס הגדרות
                 self.settings.clear()
                 
@@ -4413,11 +4459,11 @@ class OtzariaSync(QMainWindow):
                     self.light_theme_btn.setChecked(True)
                     self.dark_theme_btn.setChecked(False)
                 
-                QMessageBox.information(self, "הושלם", "כל ההגדרות אופסו לברירת מחדל")
+                hebrew_info_dialog(self, "הושלם", "כל ההגדרות אופסו לברירת מחדל")
                 
         except Exception as e:
             print(f"שגיאה באיפוס הגדרות: {e}")
-            QMessageBox.critical(self, "שגיאה", f"שגיאה באיפוס הגדרות: {e}")
+            hebrew_error_dialog(self, "שגיאה", f"שגיאה באיפוס הגדרות: {e}")
     
     def on_tab_changed(self, index):
         """טיפול בשינוי טאב עם אנימציה"""
@@ -4907,11 +4953,8 @@ class OtzariaSync(QMainWindow):
     def reset_state(self):
         self._apply_reset_button_style()
         """איפוס מצב התקדמות עם דיאלוג אישור"""
-        reply = QMessageBox.question(self, "איפוס מצב", 
-                                "האם אתה בטוח שברצונך לאפס את מצב ההתקדמות?\n\nפעולה זו תמחק את כל ההתקדמות השמורה ותחזיר אותך לשלב הראשון.",
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        
-        if reply == QMessageBox.StandardButton.Yes:
+        if hebrew_question_dialog(self, "איפוס מצב", 
+                                "האם אתה בטוח שברצונך לאפס את מצב ההתקדמות?\n\nפעולה זו תמחק את כל ההתקדמות השמורה ותחזיר אותך לשלב הראשון."):
             success = self.reset_sync_state()
             if success:
                 # איפוס משתנים גלובליים
@@ -4930,9 +4973,9 @@ class OtzariaSync(QMainWindow):
                 self.btn_reset_data.setEnabled(False)
                 # החלת הסגנון הסגול מחדש גם כשהכפתור לא פעיל
                 QTimer.singleShot(100, lambda: self._apply_reset_button_style())
-                QMessageBox.information(self, "איפוס הושלם", "מצב ההתקדמות אופס בהצלחה!")
+                hebrew_info_dialog(self, "איפוס הושלם", "מצב ההתקדמות אופס בהצלחה!")
             else:
-                QMessageBox.warning(self, "שגיאה", "שגיאה באיפוס מצב ההתקדמות")
+                hebrew_warning_dialog(self, "שגיאה", "שגיאה באיפוס מצב ההתקדמות")
 
     def reset_data(self):
         """איפוס נתוני המצב השמורים - אותה פונקציה כמו reset_state"""
@@ -4940,6 +4983,176 @@ class OtzariaSync(QMainWindow):
         self._apply_reset_button_style()
         self.reset_state()
     
+    def offer_cleanup_temp_files(self):
+        """הצעה למשתמש למחוק קבצים זמניים לאחר סיום מוצלח"""
+        try:
+            # בדיקה אם יש קבצים זמניים למחיקה
+            temp_files_exist = self._check_temp_files_exist()
+            
+            if not temp_files_exist:
+                return  # אין קבצים זמניים למחיקה
+            
+            # חישוב גודל הקבצים הזמניים
+            temp_size = self._calculate_temp_files_size()
+            size_str = self._format_size(temp_size)
+            
+            # יצירת דיאלוג שאלה עם כפתורים בעברית
+            if hebrew_question_dialog(
+                self, 
+                "מחיקת קבצים זמניים 🗑️",
+                f"האם למחוק את הקבצים הזמניים שנוצרו בתיקיית התוכנה של הסנכרון אופליין?\n\n"
+                f"גודל הקבצים הזמניים: {size_str}\n\n"
+                f"פעולה זו תמחק את כל הקבצים שהורדו, כולל קובץ המניפסט,\n"
+                f"כך שהתוכנה תהיה מוכנה להורדה חדשה מההתחלה.\n\n"
+                f"הספרים שכבר הועתקו לתיקיית אוצריא לא יימחקו.",
+                default_no=True  # ברירת מחדל: לא
+            ):
+                success = self._cleanup_temp_files()
+                if success:
+                    hebrew_info_dialog(
+                        self, 
+                        "מחיקה הושלמה ✅",
+                        f"הקבצים הזמניים נמחקו בהצלחה!\n"
+                        f"פונה מקום: {size_str}\n\n"
+                        f"התוכנה מוכנה להורדה חדשה מההתחלה."
+                    )
+                    self.log(f"קבצים זמניים נמחקו בהצלחה - פונה מקום: {size_str}")
+                else:
+                    hebrew_warning_dialog(
+                        self, 
+                        "שגיאה במחיקה",
+                        "אירעה שגיאה במחיקת חלק מהקבצים הזמניים.\n"
+                        "ייתכן שחלק מהקבצים נמחקו בהצלחה."
+                    )
+                    
+        except Exception as e:
+            self.log(f"שגיאה בהצעת מחיקת קבצים זמניים: {e}")
+    
+    def _check_temp_files_exist(self):
+        """בדיקה אם יש קבצים זמניים למחיקה"""
+        try:
+            # בדיקת תיקיית BASE_PATH
+            if os.path.exists(BASE_PATH) and os.path.isdir(BASE_PATH):
+                # בדיקה שיש תוכן בתיקיה
+                if any(os.scandir(BASE_PATH)):
+                    return True
+            
+            # בדיקת קבצי מניפסט בתיקיה הנוכחית
+            if os.path.exists(MANIFEST_FILE_NAME):
+                return True
+            if os.path.exists(DICTA_MANIFEST_FILE_NAME):
+                return True
+            if os.path.exists(STATE_FILE_NAME):
+                return True
+                
+            return False
+            
+        except Exception as e:
+            self.log(f"שגיאה בבדיקת קבצים זמניים: {e}")
+            return False
+    
+    def _calculate_temp_files_size(self):
+        """חישוב גודל הקבצים הזמניים בבייטים"""
+        total_size = 0
+        
+        try:
+            # חישוב גודל תיקיית BASE_PATH
+            if os.path.exists(BASE_PATH) and os.path.isdir(BASE_PATH):
+                for dirpath, dirnames, filenames in os.walk(BASE_PATH):
+                    for filename in filenames:
+                        filepath = os.path.join(dirpath, filename)
+                        try:
+                            total_size += os.path.getsize(filepath)
+                        except (OSError, IOError):
+                            pass
+            
+            # חישוב גודל קבצי מניפסט
+            for manifest_file in [MANIFEST_FILE_NAME, DICTA_MANIFEST_FILE_NAME, STATE_FILE_NAME]:
+                if os.path.exists(manifest_file):
+                    try:
+                        total_size += os.path.getsize(manifest_file)
+                    except (OSError, IOError):
+                        pass
+                        
+        except Exception as e:
+            self.log(f"שגיאה בחישוב גודל קבצים זמניים: {e}")
+            
+        return total_size
+    
+    def _format_size(self, size_bytes):
+        """המרת גודל בבייטים לפורמט קריא"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+    
+    def _cleanup_temp_files(self):
+        """מחיקת כל הקבצים הזמניים"""
+        success = True
+        
+        try:
+            # מחיקת תיקיית BASE_PATH
+            if os.path.exists(BASE_PATH) and os.path.isdir(BASE_PATH):
+                try:
+                    shutil.rmtree(BASE_PATH)
+                    self.log(f"תיקיית '{BASE_PATH}' נמחקה בהצלחה")
+                except Exception as e:
+                    self.log(f"שגיאה במחיקת תיקיית '{BASE_PATH}': {e}")
+                    success = False
+            
+            # מחיקת קבצי מניפסט
+            for manifest_file in [MANIFEST_FILE_NAME, DICTA_MANIFEST_FILE_NAME]:
+                if os.path.exists(manifest_file):
+                    try:
+                        os.remove(manifest_file)
+                        self.log(f"קובץ '{manifest_file}' נמחק בהצלחה")
+                    except Exception as e:
+                        self.log(f"שגיאה במחיקת קובץ '{manifest_file}': {e}")
+                        success = False
+            
+            # מחיקת קובץ המצב
+            if os.path.exists(STATE_FILE_NAME):
+                try:
+                    os.remove(STATE_FILE_NAME)
+                    self.log(f"קובץ '{STATE_FILE_NAME}' נמחק בהצלחה")
+                except Exception as e:
+                    self.log(f"שגיאה במחיקת קובץ '{STATE_FILE_NAME}': {e}")
+                    success = False
+            
+            # מחיקת קובץ גיבוי המצב
+            backup_state_file = STATE_FILE_NAME + ".backup"
+            if os.path.exists(backup_state_file):
+                try:
+                    os.remove(backup_state_file)
+                    self.log(f"קובץ גיבוי '{backup_state_file}' נמחק בהצלחה")
+                except Exception as e:
+                    self.log(f"שגיאה במחיקת קובץ גיבוי: {e}")
+                    # לא נחשב כשגיאה קריטית
+            
+            # איפוס משתנים גלובליים
+            if success:
+                global LOCAL_PATH, COPIED_DICTA
+                LOCAL_PATH = ""
+                COPIED_DICTA = False
+                
+                # עדכון UI למצב התחלתי
+                self.load_and_set_state()
+                self.progress_bar.setValue(0)
+                self.progress_bar.setVisible(False)
+                self.status_label.setText("מוכן להתחלה")
+                self.btn_reset_data.setEnabled(False)
+                QTimer.singleShot(100, lambda: self._apply_reset_button_style())
+                
+        except Exception as e:
+            self.log(f"שגיאה כללית במחיקת קבצים זמניים: {e}")
+            success = False
+            
+        return success
+
     def update_memory_info(self, memory_info):
         """עדכון מידע זיכרון בממשק"""
         try:
@@ -5027,7 +5240,7 @@ class OtzariaSync(QMainWindow):
     
     def show_success_message(self, title, message):
         """הצגת הודעת הצלחה למשתמש"""
-        QMessageBox.information(self, title, message)
+        hebrew_info_dialog(self, title, message)
         self.log(f"הצלחה: {message}")
 
     def show_version_53_warning(self):
@@ -5265,7 +5478,7 @@ class OtzariaSync(QMainWindow):
             self.log(f"נבחרה תיקיה ידנית: {folder}")
             self.load_manifests()
         else:
-            QMessageBox.warning(self, "שגיאה", "לא נבחרה תיקיה")
+            hebrew_warning_dialog(self, "שגיאה", "לא נבחרה תיקיה")
 
     # שינוי קל בטיפול בשגיאות
     def on_load_manifests_finished(self, success, message):
@@ -5305,7 +5518,7 @@ class OtzariaSync(QMainWindow):
             # עדכון סטטיסטיקות
             self.update_stats_display()
             
-            QMessageBox.information(self, "הצלחה", message)
+            hebrew_info_dialog(self, "הצלחה", message)
         else:
             self.btn_load_manifests.setEnabled(True)
             self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב גם במקרה של שגיאה
@@ -5313,7 +5526,7 @@ class OtzariaSync(QMainWindow):
             # שמירת מצב גם במקרה של שגיאה כדי לאפשר המשך
             state_data = {"step": 0, "error": message}
             self.save_sync_state(state_data)
-            QMessageBox.critical(self, "שגיאה", message)
+            hebrew_error_dialog(self, "שגיאה", message)
     
     def download_updates(self):
         if self.worker and self.worker.isRunning():
@@ -5370,7 +5583,7 @@ class OtzariaSync(QMainWindow):
                 self.save_sync_state(state_data)
                 self.btn_download_updates.setEnabled(True)  # אפשר לנסות שוב מאוחר יותר
                 self.log("אין קבצים חדשים - ניתן לבדוק שוב מאוחר יותר")
-                QMessageBox.information(self, "מעודכן", message)
+                hebrew_info_dialog(self, "מעודכן", message)
             else:
                 # אנימציה למעבר לשלב הבא
                 self.animate_step_transition(2)
@@ -5393,7 +5606,7 @@ class OtzariaSync(QMainWindow):
                 # עדכון סטטיסטיקות
                 self.update_stats_display()
                 
-                QMessageBox.information(self, "הצלחה", message)
+                hebrew_info_dialog(self, "הצלחה", message)
         else:
             self.btn_download_updates.setEnabled(True)
             self.enable_reset_after_operation()  # הפעלת כפתור איפוס מצב גם במקרה של שגיאה
@@ -5407,7 +5620,7 @@ class OtzariaSync(QMainWindow):
                 "last_sync_time": datetime.now().isoformat()
             }
             self.save_sync_state(state_data)
-            QMessageBox.critical(self, "שגיאה", message)
+            hebrew_error_dialog(self, "שגיאה", message)
     
     def apply_updates(self):
         if self.worker and self.worker.isRunning():
@@ -5480,14 +5693,18 @@ class OtzariaSync(QMainWindow):
             painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "📖")
             painter.end()
 
-            # הודעת הצלחה עם אפקט חזותי
+            # הודעת הצלחה עם אפקט חזותי וכפתור אישור בעברית
             success_msg = QMessageBox(self)
             success_msg.setIcon(QMessageBox.Icon.Information)
             success_msg.setWindowTitle("!הצלחה 🎉")
             success_msg.setIconPixmap(pixmap)
             success_msg.setText("הסנכרון הושלם בהצלחה!!\n"
                                 "כל הספרים נכנסו לתוך תוכנת אוצריא")
+            success_msg.addButton("אישור", QMessageBox.ButtonRole.AcceptRole)
             success_msg.exec()
+            
+            # הצעה למחיקת קבצים זמניים לאחר סיום מוצלח
+            self.offer_cleanup_temp_files()
             
         else:
             self.btn_apply_updates.setEnabled(True)
@@ -5503,7 +5720,7 @@ class OtzariaSync(QMainWindow):
                 "last_sync_time": datetime.now().isoformat()
             }
             self.save_sync_state(state_data)
-            QMessageBox.critical(self, "שגיאה", message)
+            hebrew_error_dialog(self, "שגיאה", message)
 
     def toggle_pause(self):
         if self.worker and self.worker.isRunning():
@@ -5839,7 +6056,7 @@ class OtzariaSync(QMainWindow):
                 self.shortcut_manager.show_help_dialog()
             else:
                 # fallback לעזרה בסיסית
-                QMessageBox.information(
+                hebrew_info_dialog(
                     self,
                     "קיצורי מקלדת",
                     "קיצורי מקלדת בסיסיים:\n\n"
@@ -5890,7 +6107,7 @@ class OtzariaSync(QMainWindow):
             if hasattr(self, 'stats_widget') and hasattr(self.stats_widget, 'export_stats'):
                 filename = self.stats_widget.export_stats()
                 if filename:
-                    QMessageBox.information(
+                    hebrew_info_dialog(
                         self,
                         "ייצוא הושלם",
                         f"הסטטיסטיקות יוצאו בהצלחה לקובץ:\n{filename}"
@@ -5933,11 +6150,8 @@ class OtzariaSync(QMainWindow):
         
         # בדיקה אם יש פעולה פעילה
         if self.worker and self.worker.isRunning():
-            reply = QMessageBox.question(self, "סגירת האפליקציה",
-                                        "יש פעולה פעילה. האם אתה בטוח שברצונך לסגור?",
-                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            
-            if reply == QMessageBox.StandardButton.Yes:
+            if hebrew_question_dialog(self, "סגירת האפליקציה",
+                                        "יש פעולה פעילה. האם אתה בטוח שברצונך לסגור?"):
                 # עצירת הפעולה
                 if self.worker:
                     self.worker.stop_search = True
