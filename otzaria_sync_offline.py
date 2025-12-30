@@ -1415,7 +1415,29 @@ class WorkerThread(QThread):
             old_manifest_file_path = os.path.join(BASE_PATH, manifest_file)
             
             try:
-                new_manifest_content = self.session.get(new_manifest_url, timeout=10).json()
+                response = self.session.get(new_manifest_url, timeout=10)
+                if response.status_code != 200:
+                    self.finished.emit(False, f"שגיאה בהורדת {manifest_file}: קוד שגיאה {response.status_code}")
+                    return
+                
+                # בדיקה שהתגובה היא JSON ולא HTML (למשל דף שגיאה)
+                content_type = response.headers.get('Content-Type', '')
+                if 'application/json' not in content_type and 'text/json' not in content_type:
+                    # ננסה בכל זאת לפרסר, אבל נשמור את התוכן למקרה של שגיאה
+                    response_text = response.text[:500]  # שומר רק 500 תווים ראשונים לדיבוג
+                else:
+                    response_text = None
+                
+                try:
+                    new_manifest_content = response.json()
+                except json.JSONDecodeError as json_err:
+                    error_msg = f"שגיאה בפענוח {manifest_file}: התגובה מהשרת אינה JSON תקין.\n"
+                    error_msg += f"סוג תוכן: {content_type}\n"
+                    if response_text:
+                        error_msg += f"תחילת התגובה: {response_text[:200]}..."
+                    self.finished.emit(False, error_msg)
+                    return
+                
                 with open(old_manifest_file_path, "r", encoding="utf-8") as f:
                     old_manifest_content = json.load(f)
                 
