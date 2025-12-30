@@ -896,12 +896,19 @@ class WorkerThread(QThread):
         
         # הגדרות session משופרות
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site'
         })
         
         # הגדרת proxy מהמערכת
@@ -1415,7 +1422,9 @@ class WorkerThread(QThread):
             old_manifest_file_path = os.path.join(BASE_PATH, manifest_file)
             
             try:
-                response = self.session.get(new_manifest_url, timeout=10)
+                # השהיה קצרה למניעת חסימה מצד השרת
+                time.sleep(0.5)
+                response = self.session.get(new_manifest_url, timeout=30)
                 if response.status_code != 200:
                     self.finished.emit(False, f"שגיאה בהורדת {manifest_file}: קוד שגיאה {response.status_code}")
                     return
