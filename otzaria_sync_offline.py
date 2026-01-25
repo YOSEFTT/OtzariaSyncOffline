@@ -257,7 +257,7 @@ def get_default_font_family():
     if platform_info['is_windows']:
         return "Segoe UI"
     elif platform_info['is_macos']:
-        return "SF Pro Text"  # או "Helvetica Neue"
+        return "Helvetica Neue"  # או "SF Pro Text"
     else:
         # Linux
         return "DejaVu Sans"  # או "Noto Sans"
