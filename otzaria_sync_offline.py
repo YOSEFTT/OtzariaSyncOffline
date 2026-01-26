@@ -138,6 +138,7 @@ def hebrew_error_dialog(parent, title, text):
     msg_box.addButton("אישור", QMessageBox.ButtonRole.AcceptRole)
     msg_box.exec()
 
+# משתנים גלובליים
 BASE_URL = "https://raw.githubusercontent.com/Y-PLONI/otzaria-library/refs/heads/main/"
 BASE_PATH = "אוצריא"
 LOCAL_PATH = ""
