@@ -1598,16 +1598,24 @@ class WorkerThread(QThread):
                     response_text = None
                 
                 try:
-                    new_manifest_content = response.json()
+                    # טיפול ב-BOM (Byte Order Mark) אם קיים בתגובה מהשרת
+                    # BOM הוא רצף של 3 בייטים שמופיע לפעמים בתחילת קבצי UTF-8
+                    # הקוד עובד גם עם BOM וגם בלעדיו
+                    response_content = response.content
+                    # הסרת BOM אם קיים (אם אין BOM, הבדיקה פשוט לא עושה כלום)
+                    if response_content.startswith(b'\xef\xbb\xbf'):
+                        response_content = response_content[3:]
+                    new_manifest_content = json.loads(response_content.decode('utf-8'))
                 except json.JSONDecodeError as json_err:
-                    error_msg = f"שגיאה בפענוח {manifest_file}: התגובה מהשרת אינה JSON תקין.\n"
-                    error_msg += f"סוג תוכן: {content_type}\n"
+                    error_msg = f"שגיאה בפענוח {manifest_file}: {str(json_err)}"
                     if response_text:
-                        error_msg += f"תחילת התגובה: {response_text[:200]}..."
+                        error_msg += f"\nתחילת התגובה: {response_text[:200]}..."
                     self.finished.emit(False, error_msg)
                     return
                 
-                with open(old_manifest_file_path, "r", encoding="utf-8") as f:
+                # קריאת הקובץ המקומי עם תמיכה ב-BOM
+                # utf-8-sig מתעלם מ-BOM אם הוא קיים, ועובד רגיל אם אין BOM
+                with open(old_manifest_file_path, "r", encoding="utf-8-sig") as f:
                     old_manifest_content = json.load(f)
                 
                 if new_manifest_content == old_manifest_content:
@@ -1631,7 +1639,8 @@ class WorkerThread(QThread):
                 del_list = [book_name.replace("/", os.sep) for book_name in old_manifest_content if book_name not in new_manifest_content]
                 all_deleted_files.extend(del_list)
 
-                # עדכון המניפסט
+                # עדכון המניפסט המקומי
+                # כתיבה עם utf-8 רגיל (ללא BOM) - זה מבטיח שהקובץ המקומי תמיד יהיה נקי
                 with open(old_manifest_file_path, "w", encoding="utf-8") as f:
                     json.dump(new_manifest_content, f, indent=2, ensure_ascii=False)
                     
