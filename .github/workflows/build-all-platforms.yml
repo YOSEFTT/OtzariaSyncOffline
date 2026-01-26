@@ -246,27 +246,49 @@ jobs:
 
       - name: Create DMG
         run: |
+          # Verify the .app bundle exists and is valid
+          if [ ! -d "dist/OtzariaSyncOffline.app" ]; then
+            echo "Error: .app bundle not found!"
+            exit 1
+          fi
+          
+          echo "Verifying .app bundle structure..."
+          ls -la dist/OtzariaSyncOffline.app/Contents/
+          
+          # Try create-dmg first
           create-dmg \
             --volname "OtzariaSyncOffline" \
-            --volicon "build/sync_otzaria.icns" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
             --icon "OtzariaSyncOffline.app" 175 190 \
             --hide-extension "OtzariaSyncOffline.app" \
             --app-drop-link 425 190 \
+            --no-internet-enable \
             "OtzariaSyncOffline-macos-intel.dmg" \
             "dist/OtzariaSyncOffline.app" \
-            || true
+            2>&1 | tee create-dmg.log || true
           
-          # Fallback if create-dmg fails
-          if [ ! -f "OtzariaSyncOffline-macos-intel.dmg" ]; then
+          # Check if DMG was created successfully
+          if [ -f "OtzariaSyncOffline-macos-intel.dmg" ]; then
+            echo "✓ create-dmg succeeded"
+            # Verify DMG integrity
+            hdiutil verify "OtzariaSyncOffline-macos-intel.dmg"
+          else
             echo "create-dmg failed, using hdiutil instead"
             hdiutil create -volname "OtzariaSyncOffline" \
               -srcfolder "dist/OtzariaSyncOffline.app" \
               -ov -format UDZO \
               "OtzariaSyncOffline-macos-intel.dmg"
+            
+            # Verify DMG integrity
+            hdiutil verify "OtzariaSyncOffline-macos-intel.dmg"
           fi
+          
+          # Show DMG info
+          echo "DMG file info:"
+          ls -lh OtzariaSyncOffline-macos-intel.dmg
+          file OtzariaSyncOffline-macos-intel.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -353,27 +375,49 @@ jobs:
 
       - name: Create DMG
         run: |
+          # Verify the .app bundle exists and is valid
+          if [ ! -d "dist/OtzariaSyncOffline.app" ]; then
+            echo "Error: .app bundle not found!"
+            exit 1
+          fi
+          
+          echo "Verifying .app bundle structure..."
+          ls -la dist/OtzariaSyncOffline.app/Contents/
+          
+          # Try create-dmg first
           create-dmg \
             --volname "OtzariaSyncOffline" \
-            --volicon "build/sync_otzaria.icns" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
             --icon "OtzariaSyncOffline.app" 175 190 \
             --hide-extension "OtzariaSyncOffline.app" \
             --app-drop-link 425 190 \
+            --no-internet-enable \
             "OtzariaSyncOffline-macos-arm64.dmg" \
             "dist/OtzariaSyncOffline.app" \
-            || true
+            2>&1 | tee create-dmg.log || true
           
-          # Fallback if create-dmg fails
-          if [ ! -f "OtzariaSyncOffline-macos-arm64.dmg" ]; then
+          # Check if DMG was created successfully
+          if [ -f "OtzariaSyncOffline-macos-arm64.dmg" ]; then
+            echo "✓ create-dmg succeeded"
+            # Verify DMG integrity
+            hdiutil verify "OtzariaSyncOffline-macos-arm64.dmg"
+          else
             echo "create-dmg failed, using hdiutil instead"
             hdiutil create -volname "OtzariaSyncOffline" \
               -srcfolder "dist/OtzariaSyncOffline.app" \
               -ov -format UDZO \
               "OtzariaSyncOffline-macos-arm64.dmg"
+            
+            # Verify DMG integrity
+            hdiutil verify "OtzariaSyncOffline-macos-arm64.dmg"
           fi
+          
+          # Show DMG info
+          echo "DMG file info:"
+          ls -lh OtzariaSyncOffline-macos-arm64.dmg
+          file OtzariaSyncOffline-macos-arm64.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -480,5 +524,6 @@ jobs:
             **macOS:**
             - פתח את קובץ ה-DMG וגרור את האפליקציה לתיקיית Applications
             - בפתיחה ראשונה: לחץ ימני → פתח (עקב Gatekeeper)
+            
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
