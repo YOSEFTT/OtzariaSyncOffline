@@ -80,7 +80,8 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0
+          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0 \
+            libfuse2 file wget
 
       - name: Install Python dependencies
         run: |
@@ -90,7 +91,7 @@ jobs:
 
       - name: Build executable
         run: |
-          ICON_FILE="build/sync_otzaria.icns"
+          ICON_FILE="build/sync_otzaria.png"
           ICON_ARG=""
           if [ -f "$ICON_FILE" ]; then
             ICON_ARG="--icon=$ICON_FILE"
@@ -101,10 +102,69 @@ jobs:
             $ICON_ARG \
             otzaria_sync_offline.py
 
-      - name: Upload artifact
+      - name: Download appimagetool
+        run: |
+          wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+
+      - name: Create AppImage structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          # Copy executable
+          cp dist/OtzariaSyncOffline AppDir/usr/bin/
+          
+          # Copy icon if exists
+          if [ -f "build/sync_otzaria.png" ]; then
+            cp build/sync_otzaria.png AppDir/usr/share/icons/hicolor/256x256/apps/otzaria-sync-offline.png
+            cp build/sync_otzaria.png AppDir/otzaria-sync-offline.png
+          fi
+          
+          # Create .desktop file
+          cat > AppDir/usr/share/applications/otzaria-sync-offline.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=OtzariaSyncOffline
+          Name[he]=סנכרון ספרי אוצריא
+          Comment=Sync Otzaria books offline
+          Comment[he]=סנכרון ספרי אוצריא במצב לא מקוון
+          Exec=OtzariaSyncOffline
+          Icon=otzaria-sync-offline
+          Categories=Utility;
+          Terminal=false
+          EOF
+          
+          # Create AppRun
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin/:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/OtzariaSyncOffline" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          
+          # Copy desktop file to root
+          cp AppDir/usr/share/applications/otzaria-sync-offline.desktop AppDir/
+
+      - name: Build AppImage
+        run: |
+          ./appimagetool AppDir OtzariaSyncOffline-linux-x64.AppImage
+          chmod +x OtzariaSyncOffline-linux-x64.AppImage
+
+      - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OtzariaSyncOffline-linux-x64
+          name: OtzariaSyncOffline-linux-x64-appimage
+          path: OtzariaSyncOffline-linux-x64.AppImage
+      
+      - name: Upload standalone executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OtzariaSyncOffline-linux-x64-bin
           path: dist/OtzariaSyncOffline
 
   build-macos-intel:
@@ -124,6 +184,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
           pip install pyinstaller pyinstaller-hooks-contrib
+          brew install create-dmg
 
       - name: Create Info.plist
         run: |
@@ -163,7 +224,7 @@ jobs:
           </plist>
           EOF
 
-      - name: Build app
+      - name: Build .app bundle
         run: |
           ICON_FILE="build/sync_otzaria.icns"
           ICON_ARG=""
@@ -171,25 +232,47 @@ jobs:
             ICON_ARG="--icon=$ICON_FILE"
           fi
           
-          PLIST_FILE="build/Info.plist"
-          PLIST_ARG=""
-          if [ -f "$PLIST_FILE" ]; then
-            PLIST_ARG="--osx-entitlements-file=$PLIST_FILE"
-          fi
-          
-          pyinstaller --noconfirm --onefile --windowed --clean \
+          pyinstaller --noconfirm --windowed --clean \
             --name=OtzariaSyncOffline \
             --osx-bundle-identifier=com.otzaria.syncoffline \
             --target-arch=x86_64 \
             $ICON_ARG \
-            $PLIST_ARG \
             otzaria_sync_offline.py
+          
+          # Copy Info.plist to the bundle
+          if [ -f "build/Info.plist" ]; then
+            cp build/Info.plist dist/OtzariaSyncOffline.app/Contents/Info.plist
+          fi
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "OtzariaSyncOffline" \
+            --volicon "build/sync_otzaria.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "OtzariaSyncOffline.app" 175 190 \
+            --hide-extension "OtzariaSyncOffline.app" \
+            --app-drop-link 425 190 \
+            "OtzariaSyncOffline-macos-intel.dmg" \
+            "dist/OtzariaSyncOffline.app" \
+            || true
+          
+          # Fallback if create-dmg fails
+          if [ ! -f "OtzariaSyncOffline-macos-intel.dmg" ]; then
+            echo "create-dmg failed, using hdiutil instead"
+            hdiutil create -volname "OtzariaSyncOffline" \
+              -srcfolder "dist/OtzariaSyncOffline.app" \
+              -ov -format UDZO \
+              "OtzariaSyncOffline-macos-intel.dmg"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OtzariaSyncOffline-macos-intel
-          path: dist/OtzariaSyncOffline
+          path: OtzariaSyncOffline-macos-intel.dmg
 
   build-macos-arm:
     name: Build (macOS Apple Silicon arm64)
@@ -208,6 +291,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
           pip install pyinstaller pyinstaller-hooks-contrib
+          brew install create-dmg
 
       - name: Create Info.plist
         run: |
@@ -247,7 +331,7 @@ jobs:
           </plist>
           EOF
 
-      - name: Build app
+      - name: Build .app bundle
         run: |
           ICON_FILE="build/sync_otzaria.icns"
           ICON_ARG=""
@@ -255,25 +339,47 @@ jobs:
             ICON_ARG="--icon=$ICON_FILE"
           fi
           
-          PLIST_FILE="build/Info.plist"
-          PLIST_ARG=""
-          if [ -f "$PLIST_FILE" ]; then
-            PLIST_ARG="--osx-entitlements-file=$PLIST_FILE"
-          fi
-          
-          pyinstaller --noconfirm --onefile --windowed --clean \
+          pyinstaller --noconfirm --windowed --clean \
             --name=OtzariaSyncOffline \
             --osx-bundle-identifier=com.otzaria.syncoffline \
             --target-arch=arm64 \
             $ICON_ARG \
-            $PLIST_ARG \
             otzaria_sync_offline.py
+          
+          # Copy Info.plist to the bundle
+          if [ -f "build/Info.plist" ]; then
+            cp build/Info.plist dist/OtzariaSyncOffline.app/Contents/Info.plist
+          fi
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "OtzariaSyncOffline" \
+            --volicon "build/sync_otzaria.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "OtzariaSyncOffline.app" 175 190 \
+            --hide-extension "OtzariaSyncOffline.app" \
+            --app-drop-link 425 190 \
+            "OtzariaSyncOffline-macos-arm64.dmg" \
+            "dist/OtzariaSyncOffline.app" \
+            || true
+          
+          # Fallback if create-dmg fails
+          if [ ! -f "OtzariaSyncOffline-macos-arm64.dmg" ]; then
+            echo "create-dmg failed, using hdiutil instead"
+            hdiutil create -volname "OtzariaSyncOffline" \
+              -srcfolder "dist/OtzariaSyncOffline.app" \
+              -ov -format UDZO \
+              "OtzariaSyncOffline-macos-arm64.dmg"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OtzariaSyncOffline-macos-arm64
-          path: dist/OtzariaSyncOffline
+          path: OtzariaSyncOffline-macos-arm64.dmg
 
   release:
     name: Create Release
@@ -299,34 +405,42 @@ jobs:
             echo "⚠ Windows build not found - skipping"
           fi
           
-          # Linux
-          if [ -d "artifacts/OtzariaSyncOffline-linux-x64" ]; then
-            cp artifacts/OtzariaSyncOffline-linux-x64/OtzariaSyncOffline \
+          # Linux AppImage
+          if [ -d "artifacts/OtzariaSyncOffline-linux-x64-appimage" ]; then
+            cp artifacts/OtzariaSyncOffline-linux-x64-appimage/OtzariaSyncOffline-linux-x64.AppImage \
+               release/OtzariaSyncOffline-linux-x64.AppImage
+            chmod +x release/OtzariaSyncOffline-linux-x64.AppImage
+            echo "✓ Linux AppImage found"
+          else
+            echo "⚠ Linux AppImage not found - skipping"
+          fi
+          
+          # Linux standalone binary
+          if [ -d "artifacts/OtzariaSyncOffline-linux-x64-bin" ]; then
+            cp artifacts/OtzariaSyncOffline-linux-x64-bin/OtzariaSyncOffline \
                release/OtzariaSyncOffline-linux-x64
             chmod +x release/OtzariaSyncOffline-linux-x64
-            echo "✓ Linux build found"
+            echo "✓ Linux standalone binary found"
           else
-            echo "⚠ Linux build not found - skipping"
+            echo "⚠ Linux standalone binary not found - skipping"
           fi
           
-          # macOS Intel
+          # macOS Intel DMG
           if [ -d "artifacts/OtzariaSyncOffline-macos-intel" ]; then
-            cp artifacts/OtzariaSyncOffline-macos-intel/OtzariaSyncOffline \
-               release/OtzariaSyncOffline-macos-intel
-            chmod +x release/OtzariaSyncOffline-macos-intel
-            echo "✓ macOS Intel build found"
+            cp artifacts/OtzariaSyncOffline-macos-intel/OtzariaSyncOffline-macos-intel.dmg \
+               release/OtzariaSyncOffline-macos-intel.dmg
+            echo "✓ macOS Intel DMG found"
           else
-            echo "⚠ macOS Intel build not found - skipping"
+            echo "⚠ macOS Intel DMG not found - skipping"
           fi
           
-          # macOS ARM
+          # macOS ARM DMG
           if [ -d "artifacts/OtzariaSyncOffline-macos-arm64" ]; then
-            cp artifacts/OtzariaSyncOffline-macos-arm64/OtzariaSyncOffline \
-               release/OtzariaSyncOffline-macos-arm64
-            chmod +x release/OtzariaSyncOffline-macos-arm64
-            echo "✓ macOS ARM build found"
+            cp artifacts/OtzariaSyncOffline-macos-arm64/OtzariaSyncOffline-macos-arm64.dmg \
+               release/OtzariaSyncOffline-macos-arm64.dmg
+            echo "✓ macOS ARM DMG found"
           else
-            echo "⚠ macOS ARM build not found - skipping"
+            echo "⚠ macOS ARM DMG not found - skipping"
           fi
           
           echo ""
@@ -345,15 +459,26 @@ jobs:
             
             ### הורדות / Downloads
             
-            | פלטפורמה | קובץ |
-            |----------|------|
-            | Windows (x64) | `OtzariaSyncOffline-windows-x64.exe` |
-            | Linux (x64) | `OtzariaSyncOffline-linux-x64` |
-            | macOS Intel | `OtzariaSyncOffline-macos-intel` |
-            | macOS Apple Silicon (M1/M2/M3) | `OtzariaSyncOffline-macos-arm64` |
+            | פלטפורמה | קובץ | הערות |
+            |----------|------|-------|
+            | Windows (x64) | `OtzariaSyncOffline-windows-x64.exe` | הורד והרץ |
+            | Linux (x64) - AppImage | `OtzariaSyncOffline-linux-x64.AppImage` | מומלץ - portable, הרץ ישירות |
+            | Linux (x64) - Binary | `OtzariaSyncOffline-linux-x64` | דורש `chmod +x` |
+            | macOS Intel | `OtzariaSyncOffline-macos-intel.dmg` | גרור ל-Applications |
+            | macOS Apple Silicon (M1/M2/M3) | `OtzariaSyncOffline-macos-arm64.dmg` | גרור ל-Applications |
             
-            ### הערות
-            - **Linux**: לאחר הורדה, יש לתת הרשאות הרצה: `chmod +x OtzariaSyncOffline-linux-x64`
-            - **macOS**: בפתיחה ראשונה, לחץ ימני → פתח (עקב Gatekeeper)
+            ### הערות התקנה
+            
+            **Windows:**
+            - הורד והרץ את קובץ ה-EXE
+            
+            **Linux:**
+            - **AppImage (מומלץ)**: הורד, תן הרשאות (`chmod +x OtzariaSyncOffline-linux-x64.AppImage`), והרץ
+            - **Binary**: הורד, תן הרשאות (`chmod +x OtzariaSyncOffline-linux-x64`), והרץ
+            - AppImage הוא portable ולא דורש התקנה
+            
+            **macOS:**
+            - פתח את קובץ ה-DMG וגרור את האפליקציה לתיקיית Applications
+            - בפתיחה ראשונה: לחץ ימני → פתח (עקב Gatekeeper)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
