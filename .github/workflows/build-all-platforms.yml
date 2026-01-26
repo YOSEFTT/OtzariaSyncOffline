@@ -193,7 +193,7 @@ jobs:
 
   build-macos-arm:
     name: Build (macOS Apple Silicon arm64)
-    runs-on: macos-14  # Apple Silicon-based macOS
+    runs-on: macos-latest  # Apple Silicon-based macOS (currently macOS 15)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
