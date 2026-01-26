@@ -2,7 +2,6 @@ import re
 import json
 import os
 import base64
-import ctypes
 import shutil
 import requests
 import sys
@@ -14,7 +13,12 @@ import threading
 import time
 import random
 import urllib.request
+import platform
 from pathlib import Path
+
+# ייבוא ctypes רק ב-Windows
+if sys.platform == 'win32':
+    import ctypes
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QSpinBox,
                            QWidget, QPushButton, QLabel, QProgressBar, QTextEdit, QDialog,
                            QFileDialog, QMessageBox, QFrame, QSlider, QCheckBox,
@@ -145,6 +149,208 @@ COPIED_DICTA = False
 
 # מזהה ייחודי לאפליקציה
 myappid = 'MIT.LEARN_PYQT.OtzariaSyncoffline'
+
+def get_platform_info():
+    """קבלת מידע על הפלטפורמה הנוכחית"""
+    return {
+        'system': platform.system(),  # 'Windows', 'Linux', 'Darwin' (macOS)
+        'machine': platform.machine(),  # 'x86_64', 'arm64', etc.
+        'is_windows': sys.platform == 'win32',
+        'is_linux': sys.platform.startswith('linux'),
+        'is_macos': sys.platform == 'darwin',
+        'is_apple_silicon': sys.platform == 'darwin' and platform.machine() == 'arm64'
+    }
+
+def get_app_data_dir():
+    """קבלת תיקיית נתוני האפליקציה בהתאם לפלטפורמה"""
+    platform_info = get_platform_info()
+    
+    if platform_info['is_windows']:
+        # Windows: %APPDATA%
+        app_data = os.getenv("APPDATA")
+        if app_data:
+            return safe_path_handling(app_data)
+        return None
+    elif platform_info['is_macos']:
+        # macOS: ~/Library/Application Support
+        return os.path.expanduser("~/Library/Application Support")
+    else:
+        # Linux: ~/.config או XDG_CONFIG_HOME
+        xdg_config = os.getenv("XDG_CONFIG_HOME")
+        if xdg_config:
+            return xdg_config
+        return os.path.expanduser("~/.config")
+
+def get_otzaria_preferences_path():
+    """קבלת נתיב קובץ ההעדפות של אוצריא בהתאם לפלטפורמה"""
+    platform_info = get_platform_info()
+    app_data = get_app_data_dir()
+    
+    if not app_data:
+        return None
+    
+    if platform_info['is_windows']:
+        return str(Path(app_data) / "com.example" / "otzaria" / "app_preferences.isar")
+    elif platform_info['is_macos']:
+        return str(Path(app_data) / "com.example.otzaria" / "app_preferences.isar")
+    else:
+        # Linux
+        return str(Path(app_data) / "com.example.otzaria" / "app_preferences.isar")
+
+def get_system_drives():
+    """קבלת רשימת כוננים/נקודות עיגון בהתאם לפלטפורמה"""
+    platform_info = get_platform_info()
+    
+    if platform_info['is_windows']:
+        # Windows: כוננים A-Z
+        drives = []
+        for i in range(ord('A'), ord('Z') + 1):
+            drive = f"{chr(i)}:\\"
+            if os.path.exists(drive):
+                drives.append(drive)
+        return drives
+    elif platform_info['is_macos']:
+        # macOS: /Volumes + home directory
+        drives = [os.path.expanduser("~")]
+        volumes_path = "/Volumes"
+        if os.path.exists(volumes_path):
+            try:
+                for volume in os.listdir(volumes_path):
+                    volume_path = os.path.join(volumes_path, volume)
+                    if os.path.isdir(volume_path):
+                        drives.append(volume_path)
+            except PermissionError:
+                pass
+        return drives
+    else:
+        # Linux: home directory + /media + /mnt
+        drives = [os.path.expanduser("~")]
+        
+        # בדיקת /media (כוננים חיצוניים)
+        media_path = f"/media/{os.getenv('USER', '')}"
+        if os.path.exists(media_path):
+            try:
+                for mount in os.listdir(media_path):
+                    mount_path = os.path.join(media_path, mount)
+                    if os.path.isdir(mount_path):
+                        drives.append(mount_path)
+            except PermissionError:
+                pass
+        
+        # בדיקת /mnt
+        mnt_path = "/mnt"
+        if os.path.exists(mnt_path):
+            try:
+                for mount in os.listdir(mnt_path):
+                    mount_path = os.path.join(mnt_path, mount)
+                    if os.path.isdir(mount_path):
+                        drives.append(mount_path)
+            except PermissionError:
+                pass
+        
+        return drives
+
+def get_available_fonts():
+    """קבלת רשימת גופנים זמינים במערכת"""
+    try:
+        from PyQt6.QtGui import QFontDatabase
+        font_db = QFontDatabase()
+        return [family for family in font_db.families()]
+    except Exception as e:
+        print(f"שגיאה בקבלת רשימת גופנים: {e}")
+        return []
+
+def get_default_font_family():
+    """קבלת גופן ברירת מחדל בהתאם לפלטפורמה עם fallback לגופנים זמינים"""
+    platform_info = get_platform_info()
+    
+    # הגדרת רשימת גופנים מועדפים לפי פלטפורמה (בסדר עדיפות)
+    if platform_info['is_windows']:
+        preferred_fonts = [
+            "Segoe UI",
+            "Arial",
+            "Tahoma",
+            "Verdana",
+            "Microsoft Sans Serif",
+            "Calibri"
+        ]
+    elif platform_info['is_macos']:
+        preferred_fonts = [
+            "SF Pro Text",
+            "Helvetica Neue",
+            "Helvetica",
+            "Arial",
+            "Lucida Grande"
+        ]
+    else:
+        # Linux
+        preferred_fonts = [
+            "Noto Sans",
+            "DejaVu Sans",
+            "Ubuntu",
+            "Liberation Sans",
+            "FreeSans",
+            "Arial"
+        ]
+    
+    # בדיקה אילו גופנים זמינים במערכת
+    try:
+        available_fonts = get_available_fonts()
+        
+        # חיפוש הגופן הראשון שזמין מהרשימה המועדפת
+        for font in preferred_fonts:
+            if font in available_fonts:
+                return font
+        
+        # אם אף גופן מועדף לא נמצא, החזרת גופן ברירת מחדל של המערכת
+        if available_fonts:
+            # העדפה לגופנים sans-serif
+            for font in available_fonts:
+                if any(keyword in font.lower() for keyword in ['sans', 'arial', 'helvetica']):
+                    return font
+            # אם לא נמצא, החזרת הגופן הראשון ברשימה
+            return available_fonts[0]
+    except Exception as e:
+        print(f"שגיאה בבחירת גופן: {e}")
+    
+    # fallback אחרון - החזרת הגופן המועדף הראשון גם אם לא זמין
+    return preferred_fonts[0]
+
+def normalize_path_for_platform(path_str):
+    """נרמול נתיב בהתאם לפלטפורמה עם טיפול בשגיאות"""
+    # בדיקת תקינות קלט
+    if not path_str or not isinstance(path_str, str):
+        return path_str
+    
+    try:
+        # ניקוי רווחים מיותרים
+        path_str = path_str.strip()
+        
+        # בדיקה שהנתיב לא ריק אחרי ניקוי
+        if not path_str:
+            return path_str
+        
+        platform_info = get_platform_info()
+        
+        if platform_info['is_windows']:
+            # המרה ל-backslash
+            normalized = path_str.replace("/", "\\")
+        else:
+            # המרה ל-forward slash
+            normalized = path_str.replace("\\", "/")
+        
+        # ניקוי slashes כפולים (למעט :// בכתובות URL)
+        if not "://" in normalized:
+            separator = "\\" if platform_info['is_windows'] else "/"
+            while separator + separator in normalized:
+                normalized = normalized.replace(separator + separator, separator)
+        
+        return normalized
+        
+    except Exception as e:
+        # במקרה של שגיאה, החזרת הנתיב המקורי
+        print(f"שגיאה בנרמול נתיב '{path_str}': {e}")
+        return path_str
 
 # מחרוזת Base64 של האייקון
 icon_base64 = "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"
@@ -1054,14 +1260,23 @@ class WorkerThread(QThread):
                     self.status.emit(f"❌ שגיאה בבדיקת תיקיה: {e}")
                     return False
             
-            # שלב 1: חיפוש בכונן C בלבד
-            self.status.emit("מחפש בכונן C...")
+            # שלב 1: חיפוש במיקום ברירת מחדל (תלוי פלטפורמה)
+            platform_info = get_platform_info()
+            
+            if platform_info['is_windows']:
+                self.status.emit("מחפש בכונן C...")
+                default_path = safe_path_handling("C:\\אוצריא")
+            elif platform_info['is_macos']:
+                self.status.emit("מחפש בתיקיית הבית...")
+                default_path = os.path.expanduser("~/אוצריא")
+            else:
+                self.status.emit("מחפש בתיקיית הבית...")
+                default_path = os.path.expanduser("~/אוצריא")
+            
             self.progress.emit(10)
             
-            # שימוש ב-pathlib לטיפול נכון בנתיב עם עברית
-            c_path = safe_path_handling("C:\\אוצריא")
-            if c_path and Path(c_path).exists() and validate_otzaria_folder(c_path):
-                LOCAL_PATH = c_path
+            if default_path and Path(default_path).exists() and validate_otzaria_folder(default_path):
+                LOCAL_PATH = default_path
                 self.status.emit(f"נמצאה תיקיית אוצריא: {LOCAL_PATH}")
                 self.copy_manifests_and_finish()
                 return
@@ -1070,47 +1285,19 @@ class WorkerThread(QThread):
                 return
             
             # שלב 2: חיפוש בקובץ העדפות
-            self.status.emit("לא נמצא בכונן C, מחפש בקובץ ההגדרות של תוכנת אוצריא...")
+            self.status.emit("לא נמצא במיקום ברירת מחדל, מחפש בקובץ ההגדרות של תוכנת אוצריא...")
             self.progress.emit(20)
             
             try:
-                # שימוש ב-pathlib לטיפול נכון בנתיבים עם עברית
-                app_data_raw = os.getenv("APPDATA")
-                self.status.emit(f"🔍 APPDATA גולמי: {app_data_raw}")
+                # שימוש בפונקציה cross-platform לקבלת נתיב נתוני האפליקציה
+                APP_DATA = get_app_data_dir()
+                self.status.emit(f"🔍 תיקיית נתוני אפליקציה: {APP_DATA}")
                 
-                if app_data_raw:
-                    APP_DATA = safe_path_handling(app_data_raw)
-                    self.status.emit(f"📁 APPDATA מעובד: {APP_DATA}")
-                    self.status.emit("✅ משתמש בטיפול משופר בנתיבים עם עברית")
+                if APP_DATA:
+                    self.status.emit("✅ משתמש בטיפול משופר בנתיבים")
                     
-                    # בדיקת קיום תיקיית com.example
-                    com_example_path = Path(APP_DATA) / "com.example"
-                    self.status.emit(f"🔍 בודק תיקיית com.example: {com_example_path}")
-                    self.status.emit(f"📂 תיקיית com.example קיימת: {com_example_path.exists()}")
-                    
-                    if com_example_path.exists():
-                        # רשימת תיקיות בתוך com.example
-                        try:
-                            subdirs = [d.name for d in com_example_path.iterdir() if d.is_dir()]
-                            self.status.emit(f"📋 תיקיות בתוך com.example: {subdirs}")
-                        except Exception as e:
-                            self.status.emit(f"❌ שגיאה ברישום תיקיות: {e}")
-                    
-                    # בדיקת תיקיית otzaria
-                    otzaria_dir = Path(APP_DATA) / "com.example" / "otzaria"
-                    self.status.emit(f"🔍 בודק תיקיית otzaria: {otzaria_dir}")
-                    self.status.emit(f"📂 תיקיית otzaria קיימת: {otzaria_dir.exists()}")
-                    
-                    if otzaria_dir.exists():
-                        # רשימת קבצים בתוך otzaria
-                        try:
-                            files = [f.name for f in otzaria_dir.iterdir() if f.is_file()]
-                            self.status.emit(f"📋 קבצים בתוך otzaria: {files}")
-                        except Exception as e:
-                            self.status.emit(f"❌ שגיאה ברישום קבצים: {e}")
-                    
-                    # שימוש ב-pathlib לבניית הנתיב
-                    FILE_PATH = str(Path(APP_DATA) / "com.example" / "otzaria" / "app_preferences.isar")
+                    # קבלת נתיב קובץ ההעדפות בהתאם לפלטפורמה
+                    FILE_PATH = get_otzaria_preferences_path()
                     self.status.emit(f"🎯 נתיב קובץ העדפות מלא: {FILE_PATH}")
                     
                     # בדיקת קיום הקובץ
@@ -1151,8 +1338,8 @@ class WorkerThread(QThread):
                                 raw_path = m.group(1)
                                 self.status.emit(f"✅ נמצא נתיב גולמי: {raw_path}")
                                 
-                                # המרת נתיב לפורמט Windows
-                                preferences_path = raw_path.replace("/", "\\")
+                                # המרת נתיב לפורמט הפלטפורמה הנוכחית
+                                preferences_path = normalize_path_for_platform(raw_path)
                                 preferences_path = safe_path_handling(preferences_path)
                                 self.status.emit(f"🛠️ נתיב מעובד: {preferences_path}")
                                 
@@ -1218,11 +1405,11 @@ class WorkerThread(QThread):
             if self.stop_search:
                 return
             
-            # שלב 3: חיפוש בתיקיות הבסיסיות של כל הכוננים
+            # שלב 3: חיפוש בתיקיות הבסיסיות של כל הכוננים/נקודות עיגון
             self.status.emit("מחפש בתיקיות הבסיסיות של כל הכוננים...")
             self.progress.emit(40)
             
-            drives = [f"{chr(i)}:\\" for i in range(ord('A'), ord('Z')+1) if os.path.exists(f"{chr(i)}:\\")]
+            drives = get_system_drives()
             
             for drive in drives:
                 # בדיקת השהיה
@@ -1487,16 +1674,24 @@ class WorkerThread(QThread):
                     response_text = None
                 
                 try:
-                    new_manifest_content = response.json()
+                    # טיפול ב-BOM (Byte Order Mark) אם קיים בתגובה מהשרת
+                    # BOM הוא רצף של 3 בייטים שמופיע לפעמים בתחילת קבצי UTF-8
+                    # הקוד עובד גם עם BOM וגם בלעדיו
+                    response_content = response.content
+                    # הסרת BOM אם קיים (אם אין BOM, הבדיקה פשוט לא עושה כלום)
+                    if response_content.startswith(b'\xef\xbb\xbf'):
+                        response_content = response_content[3:]
+                    new_manifest_content = json.loads(response_content.decode('utf-8'))
                 except json.JSONDecodeError as json_err:
-                    error_msg = f"שגיאה בפענוח {manifest_file}: התגובה מהשרת אינה JSON תקין.\n"
-                    error_msg += f"סוג תוכן: {content_type}\n"
+                    error_msg = f"שגיאה בפענוח {manifest_file}: {str(json_err)}"
                     if response_text:
-                        error_msg += f"תחילת התגובה: {response_text[:200]}..."
+                        error_msg += f"\nתחילת התגובה: {response_text[:200]}..."
                     self.finished.emit(False, error_msg)
                     return
                 
-                with open(old_manifest_file_path, "r", encoding="utf-8") as f:
+                # קריאת הקובץ המקומי עם תמיכה ב-BOM
+                # utf-8-sig מתעלם מ-BOM אם הוא קיים, ועובד רגיל אם אין BOM
+                with open(old_manifest_file_path, "r", encoding="utf-8-sig") as f:
                     old_manifest_content = json.load(f)
                 
                 if new_manifest_content == old_manifest_content:
@@ -1520,7 +1715,8 @@ class WorkerThread(QThread):
                 del_list = [book_name.replace("/", os.sep) for book_name in old_manifest_content if book_name not in new_manifest_content]
                 all_deleted_files.extend(del_list)
 
-                # עדכון המניפסט
+                # עדכון המניפסט המקומי
+                # כתיבה עם utf-8 רגיל (ללא BOM) - זה מבטיח שהקובץ המקומי תמיד יהיה נקי
                 with open(old_manifest_file_path, "w", encoding="utf-8") as f:
                     json.dump(new_manifest_content, f, indent=2, ensure_ascii=False)
                     
@@ -3301,7 +3497,7 @@ class ShortcutManager:
                 self.main_window,
                 "אודות אוצריא - סנכרון אופליין",
                 "אוצריא - סנכרון אופליין\n"
-                 "גרסה 3.2.1\n\n"
+                 "גרסה 3.2.2\n\n"
                 "תוכנה לסנכרון ספרי אוצריא ללא חיבור אינטרנט\n\n"
                 "פותח על ידי מתנדבי אוצריא  להצלחת לומדי התורה הקדושה\n"
                 "ובפרט אלו שזכו להתנתק מהרשת לגמרי, אשריהם ואשרי חלקם!!!\n\n"
@@ -4041,7 +4237,6 @@ class OtzariaSync(QMainWindow):
                 <h3 style="color: #2E7D32;">✅ טיפ 1: הכנס את קובץ התוכנה [הזאת] לתיקייה נפרדת</h3>
                 <p style="margin-bottom: 0;"><strong>מומלץ מאוד!!</strong> להכניס את התוכנה לאחר ההורדה [לפני התחלת הסנכרון] לתיקיי' בפני עצמה, כי היא יוצרת הרבה קבצים במיקום שלה, וזה יכול לגרום לכם לבלגן.
                 <br>אם לא עשיתם את זה עדיין, תוכלו עכשיו לסגור את התוכנה, ולהעביר אותה למיקום אחר, ואחר כך להפעיל אותה שוב.</p>
-                <br>אם לא עשיתם את זה עדיין, תוכלו עכשיו לסגור את התוכנה, ולהעביר אותה למיקום אחר, ואחר כך להפעיל אותה שוב.</p>
             </td></tr>
         </table>
         
@@ -4070,7 +4265,7 @@ class OtzariaSync(QMainWindow):
             <tr><td>
                 <h3 style="color: #2E7D32;">✅ טיפ 5: עקוב אחר ההתקדמות</h3>
                 <p style="margin-bottom: 0;">יומן הפעולות מציג מידע מפורט על כל פעולה. אם משהו לא עובד כצפוי, בדוק את היומן לפרטים נוספים.
-                <br>נסה לפתור את התקלה לפי ההדרכות ב 'פתרון בעיות נפוצות'.<br>
+                <br>נסה לפתור את התקלה לפי ההדרכות ב 'פתרון בעיות נפוצות' (שנמצא בהמשך עמוד זה).<br>
                 אם לא הסתדרת בעצמך, תוכל לשלוח אלינו את פירוט התקלה, בדרכים שמופיעים ב 'צור קשר ותמיכה'.</p>
             </td></tr>
         </table>
@@ -4109,7 +4304,7 @@ class OtzariaSync(QMainWindow):
             <li><code>Ctrl+E</code> - ייצוא סטטיסטיקות</li>
         </ul>
                                                                                            
-        <h2>🔧 פתרון בעיות</h2>
+        <h2>🔧 פתרון בעיות נפוצות</h2>
         
         <h3>❓ התוכנה לא מוצאת את תיקיית אוצריא</h3>
         <p>לחץ על הכפתור <strong>"בחר תיקיה ידנית"</strong> שמופיע במהלך החיפוש, ובחר את התיקיה הנכונה.</p>
@@ -4125,7 +4320,7 @@ class OtzariaSync(QMainWindow):
         </ul>
         
         <p style="text-align: center; margin-top: 30px; color: #888; font-size: 13px;">
-            תוכנת סנכרון אוצריא אופליין | גרסה 3.2.1 | MIT License
+            תוכנת סנכרון אוצריא אופליין | גרסה 3.2.2 | MIT License
         </p>
         """)
         
@@ -4713,7 +4908,7 @@ class OtzariaSync(QMainWindow):
             else:
                 # fallback לשיטה הישנה
                 self.settings.setValue("font_size", size)
-                font = QFont("Segoe UI", size)
+                font = QFont(get_default_font_family(), size)
                 self.setFont(font)
                 QApplication.instance().setFont(font)
             
@@ -5689,7 +5884,15 @@ class OtzariaSync(QMainWindow):
             pixmap = QPixmap(64, 64)
             pixmap.fill(Qt.GlobalColor.transparent)
             painter = QPainter(pixmap)
-            painter.setFont(QFont("Segoe UI Emoji", 48))
+            # שימוש בגופן emoji מתאים לפלטפורמה
+            platform_info = get_platform_info()
+            if platform_info['is_windows']:
+                emoji_font = "Segoe UI Emoji"
+            elif platform_info['is_macos']:
+                emoji_font = "Apple Color Emoji"
+            else:
+                emoji_font = "Noto Color Emoji"
+            painter.setFont(QFont(emoji_font, 48))
             painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "📖")
             painter.end()
 
@@ -6196,13 +6399,13 @@ def main():
         else:
             font_size = window.settings.value("font_size", 10, type=int)
         
-        font = QFont("Segoe UI", font_size)
+        font = QFont(get_default_font_family(), font_size)
         app.setFont(font)
         window.setFont(font)
     except Exception as e:
         print(f"שגיאה בהגדרת גופן: {e}")
         # fallback לגופן ברירת מחדל
-        font = QFont("Segoe UI", 10)
+        font = QFont(get_default_font_family(), 10)
         app.setFont(font)
         window.setFont(font)
     
