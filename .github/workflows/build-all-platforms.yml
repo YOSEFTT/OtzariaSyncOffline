@@ -152,7 +152,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          ./appimagetool AppDir OtzariaSyncOffline-linux-x64.AppImage
+          ARCH=x86_64 ./appimagetool AppDir OtzariaSyncOffline-linux-x64.AppImage
           chmod +x OtzariaSyncOffline-linux-x64.AppImage
 
       - name: Upload AppImage artifact
